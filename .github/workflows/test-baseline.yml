@@ -1,0 +1,26 @@
+name: Test - Baseline
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "demo/**"
+
+env:
+  DD_ENV: ci
+  DD_SERVICE: demo-baseline
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ./.github/actions/setup-demo
+        env:
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+      - name: Run full suite without optimization
+        run: pytest tests/ --ddtrace -v
+        env:
+          DD_ENV: ci
+          DD_SERVICE: demo-baseline
+          DD_CIVISIBILITY_ITR_ENABLED: "false"
+          DD_CIVISIBILITY_FLAKY_RETRY_ENABLED: "false"

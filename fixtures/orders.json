@@ -1,0 +1,7 @@
+[
+  {"order_id": 1001, "sku": "SKU-001", "amount": 49.99, "region": "US"},
+  {"order_id": 1002, "sku": "SKU-002", "amount": 129.50, "region": "EU"},
+  {"order_id": 1003, "sku": "SKU-003", "amount": 15.00, "region": "US"},
+  {"order_id": 1004, "sku": "SKU-004", "amount": 299.99, "region": "APAC"},
+  {"order_id": 1005, "sku": "SKU-005", "amount": 89.00, "region": "US"}
+]

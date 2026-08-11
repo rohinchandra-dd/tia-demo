@@ -1,0 +1,6 @@
+rule_id,priority,discount_pct,region
+R001,1,5,US
+R002,2,10,EU
+R003,3,15,APAC
+R004,1,7,US
+R005,2,12,EU

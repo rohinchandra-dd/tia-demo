@@ -1,0 +1,26 @@
+[project]
+name = "tia-demo-practice"
+version = "0.1.0"
+description = "Datadog CI/CD and Test Optimization demo repository"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+pythonpath = ["."]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "smoke: integration smoke tests for PR pipeline",
+    "flaky_demo: controlled flaky tests for Datadog demos",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/test_*.py" = ["E501"]
+"scripts/generate_test_modules.py" = ["E501"]

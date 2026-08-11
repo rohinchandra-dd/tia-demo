@@ -1,0 +1,24 @@
+name: Test - Impact Analysis
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "demo/**"
+
+env:
+  DD_ENV: ci
+  DD_SERVICE: demo-tia
+
+jobs:
+  tia:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ./.github/actions/setup-demo
+        env:
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+      - name: Run tests with Test Impact Analysis
+        run: pytest tests/ --ddtrace -v
+        env:
+          DD_ENV: ci
+          DD_SERVICE: demo-tia

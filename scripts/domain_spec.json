@@ -1,0 +1,84 @@
+{
+  "domains": {
+    "billing": {
+      "modules": [
+        {"name": "calculator", "operations": ["add_tax", "apply_discount", "round_currency", "split_payment"], "heavy": true},
+        {"name": "invoicing", "operations": ["generate_invoice_id", "format_line_item", "sum_line_items", "validate_invoice"], "heavy": true},
+        {"name": "discounts", "operations": ["apply_coupon", "tier_discount", "bulk_discount", "validate_promo"]},
+        {"name": "refunds", "operations": ["calculate_refund", "partial_refund", "refund_eligible", "format_refund"]}
+      ]
+    },
+    "inventory": {
+      "modules": [
+        {"name": "stock", "operations": ["check_stock", "reserve_stock", "release_stock", "stock_level"], "heavy": true},
+        {"name": "warehouse", "operations": ["assign_bin", "locate_item", "transfer_stock", "warehouse_capacity"]},
+        {"name": "reorder", "operations": ["reorder_point", "suggest_quantity", "lead_time_days", "reorder_priority"]},
+        {"name": "cycle_count", "operations": ["count_variance", "adjust_count", "schedule_count", "count_accuracy"]}
+      ]
+    },
+    "shipping": {
+      "modules": [
+        {"name": "rates", "operations": ["calculate_rate", "zone_rate", "weight_tier", "express_surcharge"], "heavy": true},
+        {"name": "tracking", "operations": ["track_status", "eta_estimate", "format_tracking_id", "delivery_window"]},
+        {"name": "labels", "operations": ["generate_label", "validate_address", "package_dimensions", "label_format"]},
+        {"name": "carriers", "operations": ["select_carrier", "carrier_score", "cutoff_time", "service_level"]}
+      ]
+    },
+    "auth": {
+      "modules": [
+        {"name": "permissions", "operations": ["has_permission", "merge_roles", "role_hierarchy", "permission_mask"], "heavy": true},
+        {"name": "tokens", "operations": ["generate_token", "validate_token", "token_expiry", "refresh_token"]},
+        {"name": "sessions", "operations": ["create_session", "revoke_session", "session_ttl", "active_sessions"]},
+        {"name": "mfa", "operations": ["generate_otp", "verify_otp", "backup_codes", "mfa_required"]}
+      ]
+    },
+    "shared": {
+      "modules": [
+        {"name": "utils", "operations": ["clamp", "normalize_email", "slugify", "safe_divide"]},
+        {"name": "validators", "operations": ["is_email", "is_phone", "is_uuid", "is_positive"]},
+        {"name": "formatters", "operations": ["format_currency", "format_date", "format_phone", "truncate_text"]},
+        {"name": "transformers", "operations": ["to_snake_case", "to_camel_case", "flatten_dict", "pick_keys"]}
+      ]
+    },
+    "catalog": {
+      "modules": [
+        {"name": "products", "operations": ["product_sku", "merge_attributes", "product_title", "variant_count"], "heavy": true},
+        {"name": "categories", "operations": ["category_path", "parent_category", "leaf_categories", "category_depth"]},
+        {"name": "search", "operations": ["search_score", "tokenize_query", "normalize_query", "rank_results"]},
+        {"name": "media", "operations": ["image_url", "alt_text", "media_type", "thumbnail_size"]}
+      ]
+    },
+    "pricing": {
+      "modules": [
+        {"name": "engine", "operations": ["base_price", "margin_price", "competitor_adjust", "price_floor"], "heavy": true},
+        {"name": "rules", "operations": ["apply_rule", "rule_priority", "match_conditions", "rule_stack"]},
+        {"name": "currency", "operations": ["convert_currency", "exchange_rate", "round_fx", "currency_symbol"]},
+        {"name": "bundles", "operations": ["bundle_price", "bundle_discount", "bundle_items", "bundle_valid"]}
+      ]
+    },
+    "notifications": {
+      "modules": [
+        {"name": "email", "operations": ["render_subject", "render_body", "validate_recipient", "batch_size"]},
+        {"name": "sms", "operations": ["format_sms", "sms_segments", "validate_phone", "sms_length"]},
+        {"name": "push", "operations": ["push_payload", "device_token", "push_priority", "collapse_key"]},
+        {"name": "templates", "operations": ["render_template", "template_vars", "template_name", "escape_html"]}
+      ]
+    },
+    "analytics": {
+      "modules": [
+        {"name": "metrics", "operations": ["aggregate_sum", "aggregate_avg", "percentile", "growth_rate"], "heavy": true},
+        {"name": "reports", "operations": ["report_period", "report_title", "row_count", "column_total"]},
+        {"name": "funnels", "operations": ["funnel_step", "conversion_rate", "drop_off", "funnel_duration"]},
+        {"name": "cohorts", "operations": ["cohort_size", "retention_rate", "cohort_period", "cohort_label"]}
+      ]
+    },
+    "compliance": {
+      "modules": [
+        {"name": "audit", "operations": ["audit_entry", "audit_hash", "audit_timestamp", "audit_actor"]},
+        {"name": "retention", "operations": ["retention_days", "purge_eligible", "archive_date", "retention_policy"]},
+        {"name": "privacy", "operations": ["mask_pii", "consent_required", "data_category", "anonymize_field"]},
+        {"name": "exports", "operations": ["export_format", "export_row", "export_header", "export_valid"]}
+      ]
+    }
+  }
+}
