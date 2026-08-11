@@ -109,9 +109,11 @@ jobs:
               }
             }
 
-            core.summary.addHeading("Datadog seed workflows dispatched");
-            core.summary.addBullet(`Main build runs: ${mainRepeats}`);
-            core.summary.addBullet(`Slow baseline: ${includeBaseline}`);
-            core.summary.addBullet(`Demo branch: ${createDemoBranch ? demoBranch : "skipped"}`);
-            core.summary.addBullet("Push to demo/seed-automation also auto-triggers test workflows on demo/**");
+            core.summary.addHeading("Datadog seed workflows dispatched", 2);
+            core.summary.addRaw(
+              `- Main build runs: ${mainRepeats}\n` +
+              `- Slow baseline: ${includeBaseline}\n` +
+              `- Demo branch: ${createDemoBranch ? demoBranch : "skipped"}\n` +
+              `- Push to demo/seed-automation also auto-triggers test workflows on demo/**\n`
+            );
             await core.summary.write();
