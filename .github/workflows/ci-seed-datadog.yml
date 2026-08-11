@@ -1,0 +1,117 @@
+name: CI - Seed Datadog Data
+
+# One-click orchestrator: triggers the demo workflows needed to populate
+# CI Visibility, Test Optimization, TIA, parallelization, and flaky history.
+on:
+  workflow_dispatch:
+    inputs:
+      main_build_repeats:
+        description: How many CI - Main Build runs (seeds TIA coverage + flaky history)
+        type: number
+        default: 3
+      include_slow_baseline:
+        description: Also run Test - Baseline (~15-25 min)
+        type: boolean
+        default: false
+      create_demo_branch:
+        description: Create/update demo/seed-automation (triggers demo/** test workflows)
+        type: boolean
+        default: true
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  prepare-demo-branch:
+    if: inputs.create_demo_branch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Create demo branch with a small billing change for TIA
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B demo/seed-automation
+          ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          if ! grep -q "Datadog seed marker" src/billing/calculator.py; then
+            printf '\n# Datadog seed marker\n' >> src/billing/calculator.py
+          else
+            sed -i "s/# Datadog seed marker.*/# Datadog seed marker ${ts}/" src/billing/calculator.py
+          fi
+          git add src/billing/calculator.py
+          git diff --staged --quiet && git commit -m "chore: seed TIA demo data ${ts}" || true
+          git push --force-with-lease origin demo/seed-automation
+
+  dispatch-workflows:
+    needs: [prepare-demo-branch]
+    if: always() && (needs.prepare-demo-branch.result == 'success' || needs.prepare-demo-branch.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger seed workflows
+        uses: actions/github-script@v7
+        env:
+          MAIN_BUILD_REPEATS: ${{ inputs.main_build_repeats }}
+          INCLUDE_SLOW_BASELINE: ${{ inputs.include_slow_baseline }}
+          CREATE_DEMO_BRANCH: ${{ inputs.create_demo_branch }}
+          DEMO_BRANCH: demo/seed-automation
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const mainRepeats = Math.max(1, Math.min(Number(process.env.MAIN_BUILD_REPEATS) || 3, 5));
+            const includeBaseline = process.env.INCLUDE_SLOW_BASELINE === 'true';
+            const createDemoBranch = process.env.CREATE_DEMO_BRANCH === 'true';
+            const demoBranch = process.env.DEMO_BRANCH;
+
+            async function dispatch(workflowId, ref, inputs = {}) {
+              core.info(`Dispatching ${workflowId} on ${ref}`);
+              await github.rest.actions.createWorkflowDispatch({
+                owner,
+                repo,
+                workflow_id: workflowId,
+                ref,
+                inputs,
+              });
+            }
+
+            const mainWorkflows = [
+              "ci-quick-smoke.yml",
+              "ci-nightly-regression.yml",
+              "ci-pr-validation.yml",
+              "test-parallelization.yml",
+            ];
+
+            for (const workflow of mainWorkflows) {
+              await dispatch(workflow, "main");
+            }
+
+            for (let i = 0; i < mainRepeats; i += 1) {
+              core.info(`Main build seed run ${i + 1}/${mainRepeats}`);
+              await dispatch("ci-main-build.yml", "main");
+            }
+
+            await dispatch("ci-hotfix-fast-path.yml", "main", { branch: "main" });
+
+            if (includeBaseline) {
+              await dispatch("test-baseline.yml", "main");
+            }
+
+            if (createDemoBranch) {
+              const demoWorkflows = [
+                "test-impact-analysis.yml",
+                "test-optimized.yml",
+              ];
+              for (const workflow of demoWorkflows) {
+                await dispatch(workflow, demoBranch);
+              }
+            }
+
+            core.summary.addHeading("Datadog seed workflows dispatched");
+            core.summary.addBullet(`Main build runs: ${mainRepeats}`);
+            core.summary.addBullet(`Slow baseline: ${includeBaseline}`);
+            core.summary.addBullet(`Demo branch: ${createDemoBranch ? demoBranch : "skipped"}`);
+            core.summary.addBullet("Push to demo/seed-automation also auto-triggers test workflows on demo/**");
+            await core.summary.write();

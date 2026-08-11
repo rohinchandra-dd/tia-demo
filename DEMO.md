@@ -9,7 +9,7 @@ Step-by-step scenarios for demonstrating Datadog CI/CD Optimization and Test Opt
 - [ ] Test Impact Analysis enabled (exclude `main`)
 - [ ] Auto Test Retries enabled for `demo-main-build`
 - [ ] Early Flake Detection enabled for `demo-pr-validation`
-- [ ] 3+ full runs on `main` completed (seeds coverage + flaky history)
+- [ ] Run **CI - Seed Datadog Data** workflow (or manual steps below)
 
 ---
 

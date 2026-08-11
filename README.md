@@ -27,7 +27,7 @@ pytest -q
 | `tests/` | ~970 parametrized tests + integration + flaky demos |
 | `tests/flaky/` | Controlled flaky tests for retry/detection demos |
 | `scripts/generate_test_modules.py` | Regenerates src + tests from `domain_spec.json` |
-| `.github/workflows/` | 8 GitHub Actions pipelines |
+| `.github/workflows/` | 10 GitHub Actions pipelines (+ seed orchestrator) |
 
 ## CI pipelines
 
@@ -40,6 +40,7 @@ Each workflow appears as a separate pipeline in [Datadog CI Visibility](https://
 | Main Build | `ci-main-build.yml` | push to `main` | Sequential stages, deploy gate, auto retries |
 | Nightly Regression | `ci-nightly-regression.yml` | cron + manual | Scheduled CI, ddtest parallelization |
 | Hotfix Fast Path | `ci-hotfix-fast-path.yml` | manual | TIA + parallel on demand |
+| **Seed Datadog Data** | `ci-seed-datadog.yml` | manual | **One-click: triggers all seed workflows** |
 | Test Baseline | `test-baseline.yml` | manual / `demo/**` | Full suite, no optimization |
 | Test Impact Analysis | `test-impact-analysis.yml` | manual / `demo/**` | TIA only |
 | Test Parallelization | `test-parallelization.yml` | manual / `demo/**` | ddtest matrix only |
@@ -80,10 +81,11 @@ In [CI/CD Optimization → Settings → Repositories](https://app.datadoghq.com/
 
 ### 4. Seeding before a live demo
 
-1. Push to `main` 3× to seed TIA coverage and flaky history
-2. Run **Test - Baseline** workflow → capture ~20 min "before" screenshot
-3. Run **Test - Optimized** on a small billing change → capture ~2 min "after"
-4. Re-run **CI - Main Build** 3× on the same commit → populate Flaky Tests table
+**Automated (recommended):** Actions → **CI - Seed Datadog Data** → Run workflow
+
+Default options dispatch Quick Smoke, Main Build ×3, Nightly, Hotfix, PR Validation, Parallelization, and create `demo/seed-automation` for TIA/optimized test workflows.
+
+Optional: enable slow baseline (~20 min), adjust main build repeat count.
 
 See [DEMO.md](DEMO.md) for step-by-step demo scripts.
 
