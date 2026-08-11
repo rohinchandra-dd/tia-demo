@@ -20,6 +20,9 @@ jobs:
     outputs:
       matrix: ${{ steps.dd_plan.outputs.matrix }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup-demo
         with:
           install_ddtest: "true"
@@ -44,6 +47,9 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.dd_plan.outputs.matrix) }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup-demo
         with:
           install_ddtest: "true"

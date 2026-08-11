@@ -1,5 +1,5 @@
 name: Setup Demo Environment
-description: Checkout, Python, dependencies, Datadog Test Optimization, and optional ddtest
+description: Python, dependencies, Datadog Test Optimization, and optional ddtest. Run actions/checkout first.
 
 inputs:
   install_ddtest:
@@ -14,10 +14,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
     - name: Setup Python
       uses: actions/setup-python@v5
       with:

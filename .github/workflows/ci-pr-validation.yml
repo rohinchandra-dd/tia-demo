@@ -25,6 +25,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup-demo
         env:
           DD_API_KEY: ${{ secrets.DD_API_KEY }}
@@ -38,6 +41,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/setup-demo
         env:
           DD_API_KEY: ${{ secrets.DD_API_KEY }}
