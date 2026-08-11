@@ -27,7 +27,7 @@ pytest -q
 | `tests/` | ~970 parametrized tests + integration + flaky demos |
 | `tests/flaky/` | Controlled flaky tests for retry/detection demos |
 | `scripts/generate_test_modules.py` | Regenerates src + tests from `domain_spec.json` |
-| `.github/workflows/` | 8 GitHub Actions pipelines |
+| `.github/workflows/` | 10 GitHub Actions pipelines |
 
 ## CI pipelines
 
@@ -35,7 +35,8 @@ Each workflow appears as a separate pipeline in [Datadog CI Visibility](https://
 
 | Pipeline | Workflow | Trigger | Demo focus |
 | --- | --- | --- | --- |
-| Quick Smoke | `ci-quick-smoke.yml` | push to `main`, manual | Fast feedback (~1 min), populates Datadog quickly |
+| Quick Smoke | `ci-quick-smoke.yml` | manual | Fast feedback (~1 min), populates Datadog quickly |
+| Quick Parallel | `ci-quick-parallel.yml` | manual | ddtest matrix on fast tests (~2–4 min) |
 | PR Validation | `ci-pr-validation.yml` | `pull_request` | Job DAG, TIA on PRs, smoke tests |
 | Main Build | `ci-main-build.yml` | push to `main` | Sequential stages, deploy gate, auto retries |
 | Nightly Regression | `ci-nightly-regression.yml` | cron + manual | Scheduled CI, ddtest parallelization |
@@ -49,8 +50,28 @@ Each workflow appears as a separate pipeline in [Datadog CI Visibility](https://
 
 Each pipeline reports to a distinct test service for clean Datadog filtering:
 
-- `demo-quick-smoke`, `demo-pr-validation`, `demo-main-build`, `demo-nightly`, `demo-hotfix`
+- `demo-quick-smoke`, `demo-quick-parallel`, `demo-pr-validation`, `demo-main-build`, `demo-nightly`, `demo-hotfix`
 - `demo-baseline`, `demo-tia`, `demo-parallel`, `demo-optimized`
+
+## Parallel runners in GitHub Actions
+
+You do **not** configure multiple GitHub-hosted runners manually. Parallelism comes from **matrix jobs** — each matrix leg gets its own runner.
+
+| Approach | How | Best for |
+| --- | --- | --- |
+| **ddtest matrix** | `dd_plan` → `dd_test` with `strategy.matrix` | Test Parallelization demo (see `ci-quick-parallel.yml`) |
+| **GitHub-hosted** | Up to 20 concurrent jobs on Free ([docs](https://docs.github.com/en/actions/reference/limits)) | Default; matrix jobs run in parallel when slots are free |
+| **Self-hosted** | Settings → Actions → Runners → New runner per machine | Unlimited machines you control |
+
+**Why Quick Smoke queued behind Main Build:** both were triggered on `push` to `main`, and the Main Build `test` job holds a runner for ~8+ minutes. Quick Smoke is now **manual-only** so you can trigger it anytime.
+
+**Try parallelization now:**
+
+1. **Actions → CI - Quick Parallel → Run workflow**
+2. Watch **2–4 `dd_test` jobs** run at once in GitHub
+3. In Datadog: **CI Pipelines** → `CI - Quick Parallel`, service `demo-quick-parallel`
+
+For the full-suite parallel demo (8 nodes), run **Test - Parallelization** or **CI - Nightly Regression** when Main Build is not running.
 
 ## Datadog setup
 

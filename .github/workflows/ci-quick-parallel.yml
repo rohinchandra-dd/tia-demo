@@ -1,0 +1,84 @@
+name: CI - Quick Parallel
+
+# Fast ddtest parallelization demo (~2-4 min). Manual trigger only so it
+# does not queue behind the full Main Build on push to main.
+on:
+  workflow_dispatch:
+
+env:
+  DD_ENV: ci
+  DD_SERVICE: demo-quick-parallel
+  DD_TEST_OPTIMIZATION_RUNNER_PLATFORM: python
+  DD_TEST_OPTIMIZATION_RUNNER_FRAMEWORK: pytest
+  DD_TEST_OPTIMIZATION_RUNNER_MIN_PARALLELISM: 2
+  DD_TEST_OPTIMIZATION_RUNNER_MAX_PARALLELISM: 4
+  DD_CIVISIBILITY_ITR_ENABLED: "false"
+
+jobs:
+  dd_plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.dd_plan.outputs.matrix }}
+      parallelism: ${{ steps.parallelism.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-demo
+        with:
+          install_ddtest: "true"
+        env:
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+      - id: dd_plan
+        name: Plan fast parallel test execution
+        run: |
+          bin/ddtest plan \
+            --tests-exclude-pattern 'tests/billing/test_calculator.py' \
+            --tests-exclude-pattern 'tests/billing/test_invoicing.py' \
+            --tests-exclude-pattern 'tests/inventory/test_stock.py' \
+            --tests-exclude-pattern 'tests/shipping/test_rates.py' \
+            --tests-exclude-pattern 'tests/auth/test_permissions.py' \
+            --tests-exclude-pattern 'tests/catalog/test_products.py' \
+            --tests-exclude-pattern 'tests/pricing/test_engine.py' \
+            --tests-exclude-pattern 'tests/analytics/test_metrics.py' \
+            --tests-exclude-pattern 'tests/flaky/**' \
+            --tests-exclude-pattern 'tests/integration/**'
+        env:
+          DD_ENV: ci
+          DD_SERVICE: demo-quick-parallel
+      - id: parallelism
+        name: Report selected parallelism
+        run: |
+          count=$(cat .testoptimization/runner/parallel-runners.txt)
+          echo "count=${count}" >> "$GITHUB_OUTPUT"
+          echo "ddtest selected ${count} parallel runner(s)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dd-artifacts-quick-parallel
+          path: .testoptimization
+          include-hidden-files: true
+
+  dd_test:
+    runs-on: ubuntu-latest
+    needs: [dd_plan]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.dd_plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-demo
+        with:
+          install_ddtest: "true"
+        env:
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: dd-artifacts-quick-parallel
+          path: .testoptimization
+      - name: Run parallel tests (node ${{ matrix.ci_node_index }})
+        run: bin/ddtest run --ci-node ${{ matrix.ci_node_index }}
+        env:
+          DD_ENV: ci
+          DD_SERVICE: demo-quick-parallel

@@ -2,8 +2,6 @@ name: CI - Quick Smoke
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
 
 env:
   DD_ENV: ci
