@@ -340,7 +340,7 @@ def generate_test_file(
         [
             "import pytest",
             "",
-            f"from {import_path} import {', '.join(ops)}",
+            f"from src.{domain} import {module} as _module",
             "",
         ]
     )
@@ -361,7 +361,7 @@ def generate_test_file(
         lines.append('    """Execute operation and assert result is usable."""')
         if idx == 0 and slow:
             lines.append("    time.sleep(2 + (hash(call_expr) % 4))")
-        lines.append("    result = eval(call_expr)")
+        lines.append("    result = eval(call_expr, vars(_module))")
         lines.append("    if isinstance(result, bool):")
         lines.append("        assert result in (True, False)")
         lines.append("    else:")

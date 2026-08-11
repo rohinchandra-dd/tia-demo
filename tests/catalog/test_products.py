@@ -4,6 +4,8 @@ import time
 
 import pytest
 
+from src.catalog import products as _module
+
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
@@ -52,7 +54,7 @@ import pytest
 def test_product_sku(call_expr):
     """Execute operation and assert result is usable."""
     time.sleep(2 + (hash(call_expr) % 4))
-    result = eval(call_expr)
+    result = eval(call_expr, vars(_module))
     if isinstance(result, bool):
         assert result in (True, False)
     else:
@@ -104,7 +106,7 @@ def test_product_sku(call_expr):
 )
 def test_merge_attributes(call_expr):
     """Execute operation and assert result is usable."""
-    result = eval(call_expr)
+    result = eval(call_expr, vars(_module))
     if isinstance(result, bool):
         assert result in (True, False)
     else:
@@ -156,7 +158,7 @@ def test_merge_attributes(call_expr):
 )
 def test_product_title(call_expr):
     """Execute operation and assert result is usable."""
-    result = eval(call_expr)
+    result = eval(call_expr, vars(_module))
     if isinstance(result, bool):
         assert result in (True, False)
     else:
@@ -208,7 +210,7 @@ def test_product_title(call_expr):
 )
 def test_variant_count(call_expr):
     """Execute operation and assert result is usable."""
-    result = eval(call_expr)
+    result = eval(call_expr, vars(_module))
     if isinstance(result, bool):
         assert result in (True, False)
     else:

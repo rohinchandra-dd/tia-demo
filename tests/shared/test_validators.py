@@ -2,6 +2,8 @@
 
 import pytest
 
+from src.shared import validators as _module
+
 
 @pytest.mark.parametrize(
     "call_expr",
@@ -24,7 +26,7 @@ import pytest
 )
 def test_is_email(call_expr):
     """Execute operation and assert result is usable."""
-    result = eval(call_expr)
+    result = eval(call_expr, vars(_module))
     if isinstance(result, bool):
         assert result in (True, False)
     else:
@@ -52,7 +54,7 @@ def test_is_email(call_expr):
 )
 def test_is_phone(call_expr):
     """Execute operation and assert result is usable."""
-    result = eval(call_expr)
+    result = eval(call_expr, vars(_module))
     if isinstance(result, bool):
         assert result in (True, False)
     else:
