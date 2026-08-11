@@ -210,9 +210,10 @@ def generate_src_module(domain: str, module: str, operations: list[str]) -> str:
     for op in operations:
         sig = op_signature(op)
         body = op_impl(op)
+        if len(lines) > 2:
+            lines.append("")
         lines.append(f"def {op}({sig}):")
         lines.append(f"    {body}")
-        lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -324,7 +325,6 @@ def generate_test_file(
     heavy: bool,
     slow: bool,
 ) -> str:
-    import_path = f"src.{domain}.{module}"
     func_count = HEAVY_FUNCTIONS if heavy else LIGHT_FUNCTIONS
     param_count = HEAVY_PARAM_COUNT if heavy else LIGHT_PARAM_COUNT
     ops = operations[:func_count]
