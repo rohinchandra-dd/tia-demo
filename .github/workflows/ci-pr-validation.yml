@@ -32,10 +32,11 @@ jobs:
         env:
           DD_API_KEY: ${{ secrets.DD_API_KEY }}
       - name: Run unit tests with TIA
-        run: pytest tests/ --ignore=tests/integration --ignore=tests/flaky --ddtrace -v
+        run: pytest tests/ --ignore=tests/integration --ddtrace -v
         env:
           DD_ENV: ci
           DD_SERVICE: demo-pr-validation
+          DD_CIVISIBILITY_FLAKY_RETRY_COUNT: "5"
 
   integration-smoke:
     runs-on: ubuntu-latest
