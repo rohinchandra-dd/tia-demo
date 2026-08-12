@@ -36,7 +36,7 @@ Each workflow appears as a separate pipeline in [Datadog CI Visibility](https://
 | Pipeline | Workflow | Trigger | Demo focus |
 | --- | --- | --- | --- |
 | Quick Smoke | `ci-quick-smoke.yml` | push to `main`, manual | Fast feedback (~1 min), populates Datadog quickly |
-| PR Validation | `ci-pr-validation.yml` | `pull_request` | Job DAG, TIA on PRs, smoke tests |
+| PR Validation | `ci-pr-validation.yml` | `pull_request` | Job DAG, TIA on PRs, smoke + **flaky-tests** (EFD) |
 | Main Build | `ci-main-build.yml` | push to `main` | Sequential stages, deploy gate, auto retries |
 | Nightly Regression | `ci-nightly-regression.yml` | cron + manual | Scheduled CI, ddtest parallelization |
 | Hotfix Fast Path | `ci-hotfix-fast-path.yml` | manual | TIA + parallel on demand |
