@@ -21,7 +21,7 @@ jobs:
         env:
           DD_API_KEY: ${{ secrets.DD_API_KEY }}
       - name: Run tests with Test Impact Analysis
-        run: pytest tests/ --ddtrace -v
+        run: pytest tests/ --ignore=tests/flaky --ddtrace -v
         env:
           DD_ENV: ci
           DD_SERVICE: demo-tia

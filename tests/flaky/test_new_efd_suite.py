@@ -1,7 +1,7 @@
 """New flaky tests for Early Flake Detection — added in PR demo/expand-flaky-tests-pr.
 
-Datadog treats these as @test.is_new and retries them up to 10 times when EFD is enabled
-on the demo-pr-validation service.
+Each test fails once then passes on retry. Datadog tags them @test.is_new and EFD
+retries up to 10 times when enabled on demo-pr-validation.
 """
 
 from __future__ import annotations

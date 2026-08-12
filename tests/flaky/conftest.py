@@ -2,33 +2,35 @@
 
 from __future__ import annotations
 
+import os
 import random
 
 import pytest
 
-# Module-level attempt counters survive ddtrace in-process retries.
-_attempts: dict[str, int] = {}
+
+def _attempt(key: str) -> int:
+    """Count attempts in-process so EFD and Auto Test Retries share state."""
+    env_key = f"_FLAKY_DEMO_{key}"
+    count = int(os.environ.get(env_key, "0")) + 1
+    os.environ[env_key] = str(count)
+    return count
 
 
 def fail_once(key: str, message: str) -> None:
     """Fail on the first attempt, pass on Auto Test Retry."""
-    _attempts[key] = _attempts.get(key, 0) + 1
-    if _attempts[key] == 1:
+    if _attempt(key) == 1:
         pytest.fail(message)
 
 
 def maybe_flake(probability: float, message: str) -> None:
     """Probabilistic failure on the first attempt; passes on Auto Test Retry."""
-    _attempts[message] = _attempts.get(message, 0) + 1
-    if _attempts[message] == 1 and random.random() < probability:
+    if _attempt(message) == 1 and random.random() < probability:
         pytest.fail(message)
 
 
 def efd_alternate(key: str, message: str) -> None:
-    """Alternate pass/fail across attempts — surfaces with Early Flake Detection."""
-    _attempts[key] = _attempts.get(key, 0) + 1
-    if _attempts[key] % 2 == 1:
-        pytest.fail(message)
+    """Fail once on new tests — Early Flake Detection retries until pass."""
+    fail_once(key, message)
 
 
 @pytest.fixture
