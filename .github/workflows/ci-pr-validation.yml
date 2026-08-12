@@ -36,6 +36,7 @@ jobs:
         env:
           DD_ENV: ci
           DD_SERVICE: demo-pr-validation
+          DD_CIVISIBILITY_FLAKY_RETRY_COUNT: "5"
 
   integration-smoke:
     runs-on: ubuntu-latest

@@ -38,7 +38,7 @@ jobs:
           DD_ENV: ci
           DD_SERVICE: demo-main-build
           DD_CIVISIBILITY_ITR_ENABLED: "false"
-          DD_CIVISIBILITY_FLAKY_RETRY_COUNT: "3"
+          DD_CIVISIBILITY_FLAKY_RETRY_COUNT: "5"
 
   deploy-staging:
     runs-on: ubuntu-latest

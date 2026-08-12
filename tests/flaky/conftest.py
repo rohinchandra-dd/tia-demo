@@ -18,8 +18,9 @@ def fail_once(key: str, message: str) -> None:
 
 
 def maybe_flake(probability: float, message: str) -> None:
-    """Probabilistic failure for Flaky Tests dashboard demos."""
-    if random.random() < probability:
+    """Probabilistic failure on the first attempt; passes on Auto Test Retry."""
+    _attempts[message] = _attempts.get(message, 0) + 1
+    if _attempts[message] == 1 and random.random() < probability:
         pytest.fail(message)
 
 
