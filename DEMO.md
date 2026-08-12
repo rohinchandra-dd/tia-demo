@@ -105,16 +105,15 @@ Step-by-step scenarios for demonstrating Datadog CI/CD Optimization and Test Opt
 
 ### C4 — Early Flake Detection
 
-1. Create branch `demo/introduce-flaky-test`
-2. Copy the template: `cp tests/flaky/_template_test_new_flaky_efd.py tests/flaky/test_new_flaky_efd.py`
-3. Open PR → **CI - PR Validation** runs
-3. Find `@test.is_new:true` and EFD retries on the new test
-4. Optionally configure a PR Gate to block merge
+1. Open PR from `demo/expand-flaky-tests-pr` (includes `tests/flaky/test_new_efd_suite.py`)
+2. **CI - PR Validation** → `flaky-tests` job
+3. Find `@test.is_new:true` on the 8 new EFD tests in Test Runs
+4. Optionally configure a PR Gate to block merge on new flaky tests
 
 ### C5 — TIA reduces flaky exposure
 
-1. On a PR changing only `src/analytics/metrics.py`
-2. Show flaky inventory/shipping tests are **skipped** by TIA
+1. On a follow-up PR changing only `src/analytics/metrics.py`
+2. **flaky-tests** job skips billing/shipping/inventory flaky tests via TIA
 3. Unrelated flakes don't block the PR
 
 ---
@@ -128,12 +127,12 @@ git checkout -b demo/tia-billing-fix
 git commit -am "fix: billing tax rounding"
 git push -u origin demo/tia-billing-fix
 
-# EFD demo — copy template to create a genuinely new test
-git checkout -b demo/introduce-flaky-test
-cp tests/flaky/_template_test_new_flaky_efd.py tests/flaky/test_new_flaky_efd.py
-git add tests/flaky/test_new_flaky_efd.py
-git commit -m "feat: add checkout flow test"
-git push -u origin demo/introduce-flaky-test
+# EFD + expanded flaky suite demo
+git checkout demo/expand-flaky-tests-pr
+gh pr create --title "Expand flaky test suite for TIA and EFD demos" --body "Adds domain flaky tests and new EFD suite"
+
+# TIA on flaky tests — change unrelated module on the PR branch
+# edit src/analytics/metrics.py only → flaky-tests skips billing/shipping suites
 
 # Force full suite (escape hatch)
 git commit -am "ITR:NoSkip chore: run all tests"
