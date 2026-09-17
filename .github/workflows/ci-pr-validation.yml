@@ -25,6 +25,8 @@ jobs:
         env:
           DD_ENV: ci
           DD_SERVICE: demo-pr-validation
+          DD_CIVISIBILITY_AUTO_TEST_RETRIES_ENABLED: "false"
+          DD_CIVISIBILITY_FLAKY_RETRY_COUNT: "0"
 
   slow-build-job:
     name: slow-build-job
@@ -33,6 +35,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: ./.github/actions/setup-demo
+        env:
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
       - name: Slow build step (fails after 2m on attempt 1, passes on retry)
         shell: bash
         run: |
