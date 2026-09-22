@@ -31,18 +31,8 @@ jobs:
           DD_CIVISIBILITY_AUTO_TEST_RETRIES_ENABLED: "false"
           DD_CIVISIBILITY_FLAKY_RETRY_COUNT: "0"
         run: |
-          if [ "${GITHUB_RUN_ATTEMPT:-1}" = "1" ]; then
-            echo "Attempt 1: Running fast tests and failing check (<30s)..."
-            pytest tests/test_pr_signals_demo.py --ddtrace -v
-            echo "Simulated fast required check failure for PR Signals demo"
-            exit 1
-          else
-            echo "Attempt ${GITHUB_RUN_ATTEMPT}: Waiting 20s for sibling build jobs to finalize..."
-            sleep 20
-            pytest tests/test_pr_signals_demo.py --ddtrace -v
-            echo "All checks passed on retry"
-            exit 0
-          fi
+          pytest tests/test_pr_signals_demo.py --ddtrace -v
+          echo "Fast test check passed"
 
   slow-build-job:
     name: slow-build-job
@@ -54,18 +44,11 @@ jobs:
       - uses: ./.github/actions/setup-demo
         env:
           DD_API_KEY: ${{ secrets.DD_API_KEY }}
-      - name: Slow build step (fails after 2m on attempt 1, passes on retry)
+      - name: Build step
         shell: bash
         run: |
-          if [ "${GITHUB_RUN_ATTEMPT:-1}" = "1" ]; then
-            echo "Attempt 1: running 2-minute workload to demonstrate Slack message update..."
-            sleep 120
-            echo "Simulated slow job failure for PR Signals update demo"
-            exit 1
-          else
-            echo "Manual retry detected (attempt ${GITHUB_RUN_ATTEMPT}) — passing immediately!"
-            exit 0
-          fi
+          echo "Build step passed successfully"
+          exit 0
 
   optional-job:
     name: optional-job
@@ -74,15 +57,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - name: Optional failing check (demonstrates PR Signals ignores non-required failures)
+      - name: Optional check
         shell: bash
         run: |
-          echo "Simulating optional / non-required check..."
-          sleep 10
-          if [ "${GITHUB_RUN_ATTEMPT:-1}" = "1" ]; then
-            echo "Intentional optional job failure (AllowedToFail demo)"
-            exit 1
-          else
-            echo "Optional check passed on retry"
-            exit 0
-          fi
+          echo "Optional check passed"
+          exit 0
