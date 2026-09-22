@@ -23,13 +23,22 @@ jobs:
         env:
           DD_API_KEY: ${{ secrets.DD_API_KEY }}
       - name: Run fast test scenario (< 30s, reports to Datadog)
-        run: pytest tests/test_pr_signals_demo.py --ddtrace -v
+        shell: bash
         env:
           DD_ENV: ci
           DD_SERVICE: demo-pr-validation
           DD_CIVISIBILITY_ITR_ENABLED: "false"
           DD_CIVISIBILITY_AUTO_TEST_RETRIES_ENABLED: "false"
           DD_CIVISIBILITY_FLAKY_RETRY_COUNT: "0"
+        run: |
+          pytest tests/test_pr_signals_demo.py --ddtrace -v
+          if [ "${GITHUB_RUN_ATTEMPT:-1}" = "1" ]; then
+            echo "Attempt 1: Simulated fast required check failure for PR Signals demo"
+            exit 1
+          else
+            echo "Attempt ${GITHUB_RUN_ATTEMPT}: All fast checks passing on retry"
+            exit 0
+          fi
 
   slow-build-job:
     name: slow-build-job
