@@ -31,12 +31,16 @@ jobs:
           DD_CIVISIBILITY_AUTO_TEST_RETRIES_ENABLED: "false"
           DD_CIVISIBILITY_FLAKY_RETRY_COUNT: "0"
         run: |
-          pytest tests/test_pr_signals_demo.py --ddtrace -v
           if [ "${GITHUB_RUN_ATTEMPT:-1}" = "1" ]; then
-            echo "Attempt 1: Simulated fast required check failure for PR Signals demo"
+            echo "Attempt 1: Running fast tests and failing check (<30s)..."
+            pytest tests/test_pr_signals_demo.py --ddtrace -v
+            echo "Simulated fast required check failure for PR Signals demo"
             exit 1
           else
-            echo "Attempt ${GITHUB_RUN_ATTEMPT}: All fast checks passing on retry"
+            echo "Attempt ${GITHUB_RUN_ATTEMPT}: Waiting 20s for sibling build jobs to finalize..."
+            sleep 20
+            pytest tests/test_pr_signals_demo.py --ddtrace -v
+            echo "All checks passed on retry"
             exit 0
           fi
 
@@ -59,7 +63,7 @@ jobs:
             echo "Simulated slow job failure for PR Signals update demo"
             exit 1
           else
-            echo "Manual retry detected (attempt ${GITHUB_RUN_ATTEMPT}) — passing!"
+            echo "Manual retry detected (attempt ${GITHUB_RUN_ATTEMPT}) — passing immediately!"
             exit 0
           fi
 
