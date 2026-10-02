@@ -1,7 +1,7 @@
 """Auth mfa module — demo business logic."""
 
 
-def generate_otp(seed: str):
+def generate_otp(seed: str) -> str:
     return str(abs(hash(seed)) % 1000000).zfill(6)
 
 
