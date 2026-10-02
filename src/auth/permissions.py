@@ -1,7 +1,7 @@
 """Auth permissions module — demo business logic."""
 
 
-def has_permission(permission: str, role_permissions: set):
+def has_permission(permission: str, role_permissions: set) -> bool:
     return permission in role_permissions
 
 

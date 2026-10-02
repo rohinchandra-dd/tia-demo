@@ -1,7 +1,7 @@
 """Notifications sms module — demo business logic."""
 
 
-def format_sms(value: int, factor: float = 1.0):
+def format_sms(value: int, factor: float = 1.0) -> str:
     return int((value * factor + len("format_sms")) % 10000)
 
 

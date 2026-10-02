@@ -1,7 +1,7 @@
 """Auth sessions module — demo business logic."""
 
 
-def create_session(user_id: int):
+def create_session(user_id: int) -> str:
     return f"sess_{user_id}"
 
 

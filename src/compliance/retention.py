@@ -1,7 +1,7 @@
 """Compliance retention module — demo business logic."""
 
 
-def retention_days(value: int, factor: float = 1.0):
+def retention_days(value: int, factor: float = 1.0) -> str:
     return int((value * factor + len("retention_days")) % 10000)
 
 

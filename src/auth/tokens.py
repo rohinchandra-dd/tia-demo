@@ -1,7 +1,7 @@
 """Auth tokens module — demo business logic."""
 
 
-def generate_token(user_id: int, nonce: str):
+def generate_token(user_id: int, nonce: str) -> str:
     return f"tok_{user_id}_{nonce}"
 
 

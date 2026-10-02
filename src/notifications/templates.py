@@ -1,7 +1,7 @@
 """Notifications templates module — demo business logic."""
 
 
-def render_template(value: int, factor: float = 1.0):
+def render_template(value: int, factor: float = 1.0) -> str:
     return int((value * factor + len("render_template")) % 10000)
 
 
