@@ -81,7 +81,15 @@ is where the 3.8x difference actually lives.
 3. Push to `preprod` once and let `TIA PR Demo` run. That run executes the full suite and
    seeds coverage. **Do not demo on this run** — it correctly skips nothing.
 
-**Run the demo:**
+**Re-run the demo (PR #6 already exists — this is the normal path):**
+```bash
+git checkout tia/add-tax-fix && git pull
+git commit --allow-empty -m "Trigger TIA demo" && git push
+```
+Both jobs re-run on every push. Verified: `baseline` 965 passed in 152.55s,
+`tia` 77 passed / 888 skipped in 38.42s. Repeat as often as you like.
+
+**Build it from scratch instead:**
 ```bash
 git checkout preprod && git pull
 git checkout -b tia/add-tax-fix          # must NOT match demo/** or 4 extra workflows fire
