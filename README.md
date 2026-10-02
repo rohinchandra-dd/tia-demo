@@ -47,8 +47,8 @@ Each workflow appears as a separate pipeline in [Datadog CI Visibility](https://
 | Test Impact Analysis | `test-impact-analysis.yml` | manual / `demo/**` | _Seeding only_ — superseded as a demo by TIA PR Demo |
 | Test Parallelization | `test-parallelization.yml` | manual / `demo/**` | ddtest matrix only |
 | Test Optimized | `test-optimized.yml` | manual / `demo/**` | TIA + parallel combined |
-| **TIA PR Demo** | `tia-pr-demo.yml` | PRs into `preprod` touching `src/billing/**` | **Baseline vs TIA, side by side on one PR** |
-| **Parallel PR Demo** | `parallel-pr-demo.yml` | PRs into `preprod` touching `src/{analytics,auth,catalog,inventory}/**` | **Naive vs duration split vs TIA + parallel, on one PR** |
+| **TIA PR Demo** | `tia-pr-demo.yml` | PRs into `preprod` touching `src/billing/**` | **Baseline vs TIA across 4 nodes (8 checks)** |
+| **Parallel PR Demo** | `parallel-pr-demo.yml` | PRs into `preprod` touching `src/{analytics,auth,catalog,inventory}/**` | **Naive count split vs ddtest duration split** (needs `ITR:NoSkip` in the commit message) |
 
 ### Test services (`DD_SERVICE`)
 

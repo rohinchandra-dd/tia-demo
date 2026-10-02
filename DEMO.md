@@ -53,42 +53,37 @@ Step-by-step scenarios for demonstrating Datadog CI/CD Optimization and Test Opt
 
 ## Part B: Test Optimization (~10 min)
 
-### B0 — TIA side by side on a single PR (primary TIA demo)
+### B0 — Test Impact Analysis across 4 nodes (primary TIA demo)
 
-One PR, exactly two checks, both running the same suite — 965 tests (972 minus the 7
-flaky demo tests, which both legs `--ignore`):
+> **The commit message must NOT contain `ITR:NoSkip`.** That flag forces the full suite and
+> would disable the very skipping this demo exists to show. (The parallelization demo in B1
+> needs the opposite — the two are easy to mix up.)
 
-| Job | TIA | Tests run | Test time | Job time |
-| --- | --- | --- | --- | --- |
-| `baseline` | disabled | 965 | 2m 32s | ~3m 00s |
-| `tia` | enabled | 77 (888 skipped) | 39.7s | ~1m 15s |
+One PR, 8 checks. Both legs run the identical 965-test suite, split across the same 4 nodes by
+the same naive file-count shard. The only difference is `DD_CIVISIBILITY_ITR_ENABLED`.
 
-Measured on PR #6. Job time includes ~35s of fixed setup (checkout, pip install, Datadog
-agent config) on both legs, so quote the **test time** — that is what Datadog displays and it
-is where the 3.8x difference actually lives.
+| Leg | node 0 | node 1 | node 2 | node 3 | Slowest | Total compute |
+| --- | --- | --- | --- | --- | --- | --- |
+| `baseline` | 300 passed **70.0s** | 240 passed 33.5s | 173 passed 16.7s | 252 passed 33.9s | **70.0s** | 154s |
+| `tia` | 72 passed, 228 skipped **38.0s** | 240 skipped **1.4s** | 5 passed, 168 skipped **1.2s** | 12 passed, 240 skipped **1.4s** | **38.0s** | 42s |
 
-**Setup (once):**
-1. `preprod` branch exists and is **not** protected — this is what keeps the PR Signals
-   required checks (`fast-test-job`, `slow-build-job`) off this PR.
-2. **Required.** In CI/CD Settings -> Repositories, add `preprod` to the Test Impact Analysis
-   **excluded branches** list. Excluded branches still collect per-test coverage but never
-   skip, which is what makes `preprod` a valid seeding branch. Datadog does not backfill
-   coverage for Python, so coverage only exists where a full run produced it.
+Measured on PR #6, run 37056345192. Quote **test time**, not job time — both legs pay ~25s of
+fixed setup (checkout, pip, Datadog agent).
 
-   **Symptom if this is not set:** a push to `preprod` logs something like
-   `5 passed, 960 skipped in 2.54s` — it skipped instead of re-seeding, so coverage goes
-   stale and later demo PRs gradually stop skipping. A correct seed run logs
-   `965 passed in ~2m32s`.
-3. Push to `preprod` once and let `TIA PR Demo` run. That run executes the full suite and
-   seeds coverage. **Do not demo on this run** — it correctly skips nothing.
+**The two things to say:**
+
+1. *"TIA skipped 876 of 965 tests. Wall-clock went from 70 seconds to 38, and total compute from
+   154 seconds to 42 — we are paying for a quarter of the machine time."*
+2. *"But look at the distribution. One node is doing all 38 seconds while three finish in about
+   a second. TIA removed the work; it did nothing about how the remainder is spread."*
+
+That second point is the setup for B1, which fixes exactly that.
 
 **Re-run the demo (PR #6 already exists — this is the normal path):**
 ```bash
 git checkout tia/add-tax-fix && git pull
 git commit --allow-empty -m "Trigger TIA demo" && git push
 ```
-Both jobs re-run on every push. Verified: `baseline` 965 passed in 152.55s,
-`tia` 77 passed / 888 skipped in 38.42s. Repeat as often as you like.
 
 **Build it from scratch instead:**
 ```bash
@@ -100,83 +95,98 @@ git push -u origin tia/add-tax-fix
 gh pr create --base preprod
 ```
 
-**Talking points**: both jobs run the identical pytest command on the identical commit — the
-only difference is `DD_CIVISIBILITY_ITR_ENABLED`. TIA selected the 72 tests covering
-`billing/calculator.py` plus the 5 unskippable integration tests, and skipped the other 888. Compare `demo-baseline` and `demo-tia` in Test Runs for the purple savings bar.
+**The edit must be to `src/billing/calculator.py`.** It is the only 37s file, and it lands in
+shard 0 — that is what produces the one-hot-node picture. Editing a module with no
+`sleep_seconds` budget (anything outside the 8 heavy modules) makes every node finish in about a
+second, which reads as "nothing happened".
 
-**The edit must be to `add_tax`.** TIA selects the whole `test_calculator.py` file either way,
-but only `test_add_tax` carries the 37s of sleep, so the timing works regardless of which
-function you touch in that file. Editing a module with no `sleep_seconds` budget (anything
-outside the 8 heavy modules) drops the `tia` leg to a few seconds, which reads as "it did
-nothing" rather than "it was fast".
+**Expect the test count to drift.** The run above selected 89 tests; an earlier run selected 77.
+TIA re-evaluates against whatever per-test coverage currently exists, so a file occasionally
+joins or leaves the selected set. The shape — one hot node, three idle — is stable; the exact
+count is not. Quote it from the run on screen rather than from this table.
 
-**Optional**: add `ITR:NoSkip` to the commit message to force the full suite even on the
-`tia` leg — useful for showing that the skipping is opt-out, not magic.
+**Why this leg must stay on plain `pytest`.** `DD_CIVISIBILITY_ITR_ENABLED` is a `ddtrace`
+setting. It works here because pytest runs directly. It has **no effect** when `ddtest` drives
+the run (as in B1), because `ddtest` deselects skippable tests before pytest starts. Do not
+introduce `ddtest` into this workflow.
+
+**Setup (once):** `preprod` must be in the Test Impact Analysis **excluded branches** list in
+CI/CD Settings -> Repositories. Excluded branches still collect per-test coverage but never
+skip, which is what makes `preprod` a valid seeding branch — Datadog does not backfill coverage
+for Python. Symptom if missing: a push to `preprod` logs something like `5 passed, 960 skipped`
+instead of re-seeding, and later demo PRs gradually stop skipping.
 
 **Retuning durations**: the per-file budgets live in `scripts/domain_spec.json` as
 `sleep_seconds` (150s total; 37s of it on `billing.calculator`). Change those and re-run
 `python scripts/generate_test_modules.py && ruff format src tests scripts`. Never hand-edit
 the generated test files — the next regeneration reverts them.
 
-### B1 — Test Parallelization side by side (primary parallelization demo)
+### B1 — Test Parallelization across 4-5 nodes (primary parallelization demo)
 
-One PR, three legs, same 965-test suite on the same commit. The only difference is **how the
-test files are distributed across nodes**.
+> **Every commit driving this demo must start with `ITR:NoSkip`**, including the empty ones used
+> to re-trigger it. Without it the demo silently stops being a full-suite comparison *and* the
+> split degrades to file-size guesswork. The `smart (plan)` job fails loudly if you forget.
+> (B0 needs the exact opposite — never put `ITR:NoSkip` on the TIA demo.)
 
-| Leg | Split method | Nodes | Slowest node | Node times |
-| --- | --- | --- | --- | --- |
-| `naive` | by file **count**, hand-rolled shard | 4 (fixed) | TBD | TBD |
-| `smart` | by **duration**, `ddtest plan` | ddtest picks | TBD | TBD |
-| `tia-smart` | TIA prunes, then duration split | ddtest picks | TBD | TBD |
+Picks up where B0 left off: B0 ended with one node doing all the work. Same 965-test suite, same
+commit, the only difference is **how the files are distributed**.
 
-> Numbers filled in from the first real run. Modeled expectation: naive 69s with nodes at
-> 69/32/16/33, smart ~38s flat across 4 nodes, tia-smart ~16s flat across 4 nodes.
+| Leg | Split by | Nodes | Node test times | Slowest | Total compute |
+| --- | --- | --- | --- | --- | --- |
+| `naive` | file **count** | 4 (fixed) | 70.1 / 34.4 / 33.5 / 16.6 | **70.1s** | 154.6s |
+| `smart` | **duration**, `ddtest` | 5 (ddtest chose) | 37.7 / 32.9 / 32.8 / 32.5 / 18.0 | **37.7s** | 153.8s |
 
-**The story**: the naive leg is what most teams hand-roll — chop the file list into four equal
-piles and hope. One node draws `test_calculator.py` (37s on its own) and runs more than four
-times as long as the node that drew the fast files. The `smart` leg uses the same four machines
-and finishes them together. `tia-smart` adds Test Impact Analysis on top: fewer tests *and*
-spread efficiently.
+Measured on PR #7, run 37056722490. Both legs ran all 965 tests.
 
-**Quote the test time, not the job time.** Both ddtest legs pay a sequential `plan` job
-(~45-60s: checkout, pip, ddtest download, planning), so end to end `smart` can look no faster
-than `naive`. That cost is fixed regardless of suite size — 30% of this 2.5-minute toy suite,
-noise on a customer's 40-minute one. Say that out loud rather than hoping nobody opens the
-Actions tab.
+**The story**: identical work, identical total compute — the slowest node drops from 70s to 38s
+purely by deciding *which* files go where. `ddtest` put `test_calculator.py` on a node by itself
+(72 tests, 37.7s) and packed 461 fast tests onto another that finished in 18s. The naive split
+had no idea any of that mattered.
 
-**Re-run the demo (normal path):**
+**"Why not just add more nodes?"** It chose 5 out of a permitted 8, and a 6th cannot help:
+splitting is per *file*, and `test_calculator.py` alone is 37s. That is the floor, and it is why
+node 0 sits at 37.7s. Good question to invite.
+
+**Re-run the demo (PR #7 already exists — this is the normal path):**
 ```bash
 git checkout parallel/typing-cleanup && git pull
-git commit --allow-empty -m "Trigger parallelization demo" && git push
+git commit --allow-empty -m "ITR:NoSkip trigger parallelization demo" && git push
 ```
 
 **Build it from scratch instead:**
 ```bash
 git checkout preprod && git pull
 git checkout -b parallel/typing-cleanup   # must NOT match demo/** or 4 extra workflows fire
-# touch one line in each of: src/analytics/metrics.py, src/auth/permissions.py,
-#                            src/catalog/products.py, src/inventory/stock.py
-git commit -am "chore: tidy up domain helpers"
+# touch one line in each of src/analytics/metrics.py, src/auth/permissions.py,
+#                          src/catalog/products.py, src/inventory/stock.py
+git commit -am "ITR:NoSkip chore: tidy up domain helpers"
 git push -u origin parallel/typing-cleanup
 gh pr create --base preprod
 ```
 
-**The edit must stay inside those four domains.** The workflow is path-filtered to
-`src/analytics|auth|catalog|inventory/**` so it does not fire on the TIA demo's PR. Editing
-elsewhere means **nothing runs at all** — recover with `gh workflow run parallel-pr-demo.yml`.
-Those four modules are also the ones carrying 16s of sleep each, which is what puts `tia-smart`
-on four balanced nodes instead of collapsing to one.
+**The edit must stay inside those four domains** — the workflow is path-filtered to
+`src/{analytics,auth,catalog,inventory}/**` so it cannot fire on B0's PR. Edit elsewhere and
+**nothing runs at all**; recover with `gh workflow run parallel-pr-demo.yml`.
 
-**Required setup — seeding.** `ddtest` splits on Datadog p50 file timings and silently falls back
-to file-size heuristics when it has none. Our durations are artificial sleeps uncorrelated with
-file size, so on a cold service the `smart` leg splits badly and looks no better than `naive`.
-Confirmed in practice: a run on the unseeded `demo-hotfix` service chose 1 node for the full
-suite. Push to `preprod` a few times (or run **CI - Seed Datadog Data**) and check each run's
-summary reports `ddtest chose 4 node(s)` before demoing.
+**Quote test time, not job time.** Both `smart` jobs pay a sequential ~30s `plan` job on top, so
+end to end `smart` is not much faster than `naive` here. Worth saying out loud: planning costs
+~30s regardless of suite size — 20% of this 2.5-minute toy suite, noise on a 40-minute one.
 
-**Talking points**: `ddtest` was allowed up to 8 nodes and chose 4 on its own — a 5th cannot help,
-because splitting is per *file* and `test_calculator.py` alone is 37s. That floor is the honest
-answer to "why not just add more machines."
+**Required setup — seeding.** `ddtest` splits on Datadog p50 timings and falls back to file-size
+weights without them, which are uncorrelated with this suite's artificial sleeps. Push to
+`preprod` a few times first; the plan log should read `Backend durations used: 41 suites`. If it
+reads `0 suites`, the plan job fails on purpose rather than showing a bad split.
+
+**Why `DD_CIVISIBILITY_ITR_ENABLED` is not used here.** It is a `ddtrace` setting and has no
+effect once `ddtest` drives the run — `ddtest` queries Datadog for skippable tests and deselects
+them before pytest starts. Measured: a leg with that variable set to `"false"` still ran only 288
+of 965 tests. `ITR:NoSkip` works because it acts on the API `ddtest` queries, and it clears both
+problems at once:
+
+```
+without ITR:NoSkip   tiaSkippableTestsCount=677  ->  Backend durations used: 0  / Default: 41
+with ITR:NoSkip      tiaSkippableTestsCount=0    ->  Backend durations used: 41 / Default: 0
+```
 
 ### B2 — Combined optimization (manual, single pipeline)
 
