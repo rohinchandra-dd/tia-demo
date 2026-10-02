@@ -118,17 +118,74 @@ nothing" rather than "it was fast".
 `python scripts/generate_test_modules.py && ruff format src tests scripts`. Never hand-edit
 the generated test files — the next regeneration reverts them.
 
-### B1 — Test Parallelization
+### B1 — Test Parallelization side by side (primary parallelization demo)
 
-1. Run **Test - Parallelization** on `main`
-2. Show 4–8 parallel matrix jobs
-3. Compare total wall-clock to baseline
+One PR, three legs, same 965-test suite on the same commit. The only difference is **how the
+test files are distributed across nodes**.
 
-### B2 — Combined optimization
+| Leg | Split method | Nodes | Slowest node | Node times |
+| --- | --- | --- | --- | --- |
+| `naive` | by file **count**, hand-rolled shard | 4 (fixed) | TBD | TBD |
+| `smart` | by **duration**, `ddtest plan` | ddtest picks | TBD | TBD |
+| `tia-smart` | TIA prunes, then duration split | ddtest picks | TBD | TBD |
+
+> Numbers filled in from the first real run. Modeled expectation: naive 69s with nodes at
+> 69/32/16/33, smart ~38s flat across 4 nodes, tia-smart ~16s flat across 4 nodes.
+
+**The story**: the naive leg is what most teams hand-roll — chop the file list into four equal
+piles and hope. One node draws `test_calculator.py` (37s on its own) and runs more than four
+times as long as the node that drew the fast files. The `smart` leg uses the same four machines
+and finishes them together. `tia-smart` adds Test Impact Analysis on top: fewer tests *and*
+spread efficiently.
+
+**Quote the test time, not the job time.** Both ddtest legs pay a sequential `plan` job
+(~45-60s: checkout, pip, ddtest download, planning), so end to end `smart` can look no faster
+than `naive`. That cost is fixed regardless of suite size — 30% of this 2.5-minute toy suite,
+noise on a customer's 40-minute one. Say that out loud rather than hoping nobody opens the
+Actions tab.
+
+**Re-run the demo (normal path):**
+```bash
+git checkout parallel/typing-cleanup && git pull
+git commit --allow-empty -m "Trigger parallelization demo" && git push
+```
+
+**Build it from scratch instead:**
+```bash
+git checkout preprod && git pull
+git checkout -b parallel/typing-cleanup   # must NOT match demo/** or 4 extra workflows fire
+# touch one line in each of: src/analytics/metrics.py, src/auth/permissions.py,
+#                            src/catalog/products.py, src/inventory/stock.py
+git commit -am "chore: tidy up domain helpers"
+git push -u origin parallel/typing-cleanup
+gh pr create --base preprod
+```
+
+**The edit must stay inside those four domains.** The workflow is path-filtered to
+`src/analytics|auth|catalog|inventory/**` so it does not fire on the TIA demo's PR. Editing
+elsewhere means **nothing runs at all** — recover with `gh workflow run parallel-pr-demo.yml`.
+Those four modules are also the ones carrying 16s of sleep each, which is what puts `tia-smart`
+on four balanced nodes instead of collapsing to one.
+
+**Required setup — seeding.** `ddtest` splits on Datadog p50 file timings and silently falls back
+to file-size heuristics when it has none. Our durations are artificial sleeps uncorrelated with
+file size, so on a cold service the `smart` leg splits badly and looks no better than `naive`.
+Confirmed in practice: a run on the unseeded `demo-hotfix` service chose 1 node for the full
+suite. Push to `preprod` a few times (or run **CI - Seed Datadog Data**) and check each run's
+summary reports `ddtest chose 4 node(s)` before demoing.
+
+**Talking points**: `ddtest` was allowed up to 8 nodes and chose 4 on its own — a 5th cannot help,
+because splitting is per *file* and `test_calculator.py` alone is 37s. That floor is the honest
+answer to "why not just add more machines."
+
+### B2 — Combined optimization (manual, single pipeline)
 
 1. Same billing change as B0
 2. Run **Test - Optimized**
 3. Show minimal tests + minimal nodes → ~1–2 min total
+
+Superseded as a demo by B1's `tia-smart` leg, which shows the same thing against a visible
+baseline. Kept for seeding `demo-optimized`.
 
 ---
 

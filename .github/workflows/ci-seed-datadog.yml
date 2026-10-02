@@ -10,7 +10,7 @@ on:
         type: number
         default: 3
       include_slow_baseline:
-        description: Also run Test - Baseline (~15-25 min)
+        description: Also run Test - Baseline (~3 min)
         type: boolean
         default: false
       create_demo_branch:
@@ -95,6 +95,13 @@ jobs:
 
             await dispatch("ci-hotfix-fast-path.yml", "main", { branch: "main" });
 
+            // Parallel PR Demo seeds on preprod specifically: preprod is a TIA
+            // excluded branch, so the run executes in full and seeds both the
+            // p50 file timings ddtest splits on and the TIA coverage leg C
+            // needs. ddtest picks a poor split until timings exist, so run this
+            // more than once before demoing.
+            await dispatch("parallel-pr-demo.yml", "preprod");
+
             if (includeBaseline) {
               await dispatch("test-baseline.yml", "main");
             }
@@ -114,6 +121,7 @@ jobs:
               `- Main build runs: ${mainRepeats}\n` +
               `- Slow baseline: ${includeBaseline}\n` +
               `- Demo branch: ${createDemoBranch ? demoBranch : "skipped"}\n` +
-              `- Push to demo/seed-automation also auto-triggers test workflows on demo/**\n`
+              `- Push to demo/seed-automation also auto-triggers test workflows on demo/**\n` +
+              `- Parallel PR Demo seeded on preprod; re-run it a few times so ddtest has p50 timings\n`
             );
             await core.summary.write();

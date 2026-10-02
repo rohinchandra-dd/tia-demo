@@ -29,7 +29,7 @@ pytest -q
 | `tests/` | 972 tests: 960 parametrized domain + 5 integration + 7 flaky demos |
 | `tests/flaky/` | Controlled flaky tests for retry/detection demos |
 | `scripts/generate_test_modules.py` | Regenerates src + tests from `domain_spec.json` |
-| `.github/workflows/` | 10 GitHub Actions pipelines (+ seed orchestrator) |
+| `.github/workflows/` | 11 GitHub Actions pipelines (+ seed orchestrator) |
 
 ## CI pipelines
 
@@ -47,7 +47,8 @@ Each workflow appears as a separate pipeline in [Datadog CI Visibility](https://
 | Test Impact Analysis | `test-impact-analysis.yml` | manual / `demo/**` | _Seeding only_ — superseded as a demo by TIA PR Demo |
 | Test Parallelization | `test-parallelization.yml` | manual / `demo/**` | ddtest matrix only |
 | Test Optimized | `test-optimized.yml` | manual / `demo/**` | TIA + parallel combined |
-| **TIA PR Demo** | `tia-pr-demo.yml` | PRs into `preprod` | **Baseline vs TIA, side by side on one PR** |
+| **TIA PR Demo** | `tia-pr-demo.yml` | PRs into `preprod` touching `src/billing/**` | **Baseline vs TIA, side by side on one PR** |
+| **Parallel PR Demo** | `parallel-pr-demo.yml` | PRs into `preprod` touching `src/{analytics,auth,catalog,inventory}/**` | **Naive vs duration split vs TIA + parallel, on one PR** |
 
 ### Test services (`DD_SERVICE`)
 
@@ -55,6 +56,7 @@ Each pipeline reports to a distinct test service for clean Datadog filtering:
 
 - `demo-quick-smoke`, `demo-pr-validation`, `demo-main-build`, `demo-nightly`, `demo-hotfix`
 - `demo-baseline`, `demo-tia`, `demo-parallel`, `demo-optimized`
+- `demo-parallel-naive`, `demo-parallel-smart`, `demo-parallel-tia` (Parallel PR Demo legs)
 
 ## Datadog setup
 
