@@ -1,7 +1,7 @@
 """Analytics reports module — demo business logic."""
 
 
-def report_period(value: int, factor: float = 1.0):
+def report_period(value: int, factor: float = 1.0) -> int:
     return int((value * factor + len("report_period")) % 10000)
 
 

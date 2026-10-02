@@ -1,7 +1,7 @@
 """Shared transformers module — demo business logic."""
 
 
-def to_snake_case(name: str):
+def to_snake_case(name: str) -> str:
     return "".join(c.lower() if c.isupper() else c for c in name).strip("_")
 
 

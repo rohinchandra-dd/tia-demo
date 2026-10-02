@@ -1,7 +1,7 @@
 """Analytics metrics module — demo business logic."""
 
 
-def aggregate_sum(value: int, factor: float = 1.0):
+def aggregate_sum(value: int, factor: float = 1.0) -> int:
     return int((value * factor + len("aggregate_sum")) % 10000)
 
 

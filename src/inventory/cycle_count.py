@@ -1,7 +1,7 @@
 """Inventory cycle_count module — demo business logic."""
 
 
-def count_variance(expected: int, actual: int):
+def count_variance(expected: int, actual: int) -> int:
     return abs(expected - actual)
 
 

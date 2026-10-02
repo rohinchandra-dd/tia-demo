@@ -1,7 +1,7 @@
 """Catalog media module — demo business logic."""
 
 
-def image_url(value: int, factor: float = 1.0):
+def image_url(value: int, factor: float = 1.0) -> int:
     return int((value * factor + len("image_url")) % 10000)
 
 
