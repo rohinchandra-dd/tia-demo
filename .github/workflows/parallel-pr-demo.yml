@@ -112,7 +112,10 @@ jobs:
         env:
           DD_ENV: ci
           DD_SERVICE: demo-parallel-smart
-          DD_CIVISIBILITY_ITR_ENABLED: "false"
+          # See the note on the run step below. On a PR, ITR off keeps the plan
+          # from pruning files so this leg stays a full-suite comparison
+          # against `naive`; on a push it is on so durations keep flowing.
+          DD_CIVISIBILITY_ITR_ENABLED: ${{ github.event_name == 'pull_request' && 'false' || 'true' }}
       - name: Report chosen parallelism
         run: |
           count=$(cat .testoptimization/runner/parallel-runners.txt)
@@ -150,7 +153,21 @@ jobs:
         env:
           DD_ENV: ci
           DD_SERVICE: demo-parallel-smart
-          DD_CIVISIBILITY_ITR_ENABLED: "false"
+          # ITR is ON for push (seeding) and OFF for pull_request (the demo).
+          #
+          # Measured: with DD_CIVISIBILITY_ITR_ENABLED=false the service reports
+          # no test suite durations at all, and `ddtest plan` logs
+          #   WARN "Test durations API returned no test suites" ... count=0
+          # falling back to file-size weights. Those are uncorrelated with our
+          # artificial sleeps, so the split came out WORSE than `naive`
+          # (131s slowest node vs naive's 97s). Duration-aware splitting needs
+          # the Test Optimization data that ITR collection produces.
+          #
+          # `preprod` is a TIA excluded branch, so leaving ITR on for the push
+          # leg seeds durations while skipping nothing. On the PR we turn it off
+          # so this leg runs the FULL suite and stays comparable to `naive` —
+          # by then the durations are already seeded.
+          DD_CIVISIBILITY_ITR_ENABLED: ${{ github.event_name == 'pull_request' && 'false' || 'true' }}
 
   # ---------------------------------------------------------------- leg C
   tia_smart_plan:
