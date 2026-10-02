@@ -57,10 +57,14 @@ Step-by-step scenarios for demonstrating Datadog CI/CD Optimization and Test Opt
 
 One PR, exactly two checks, both running the same 972-test suite:
 
-| Job | TIA | Tests run | Duration |
-| --- | --- | --- | --- |
-| `baseline` | disabled | 965 | ~2m 30s |
-| `tia` | enabled | ~23 | ~40s |
+| Job | TIA | Tests run | Test time | Job time |
+| --- | --- | --- | --- | --- |
+| `baseline` | disabled | 965 | 2m 32s | ~3m 00s |
+| `tia` | enabled | 77 (888 skipped) | 39.7s | ~1m 15s |
+
+Measured on PR #6. Job time includes ~35s of fixed setup (checkout, pip install, Datadog
+agent config) on both legs, so quote the **test time** — that is what Datadog displays and it
+is where the 3.8x difference actually lives.
 
 **Setup (once):**
 1. `preprod` branch exists and is **not** protected — this is what keeps the PR Signals
@@ -83,13 +87,14 @@ gh pr create --base preprod
 ```
 
 **Talking points**: both jobs run the identical pytest command on the identical commit — the
-only difference is `DD_CIVISIBILITY_ITR_ENABLED`. TIA selected the 18 `test_add_tax` cases
-that actually cover the changed line, plus the unskippable integration tests, and skipped the
-rest. Compare `demo-baseline` and `demo-tia` in Test Runs for the purple savings bar.
+only difference is `DD_CIVISIBILITY_ITR_ENABLED`. TIA selected the 72 tests covering
+`billing/calculator.py` plus the 5 unskippable integration tests, and skipped the other 888. Compare `demo-baseline` and `demo-tia` in Test Runs for the purple savings bar.
 
-**The edit must be to `add_tax`.** It is the only function in `calculator.py` covered by the
-slow (sleeping) tests; editing `apply_discount`, `round_currency`, or `split_payment` selects
-18 fast tests instead and the contrast disappears.
+**The edit must be to `add_tax`.** TIA selects the whole `test_calculator.py` file either way,
+but only `test_add_tax` carries the 37s of sleep, so the timing works regardless of which
+function you touch in that file. Editing a module with no `sleep_seconds` budget (anything
+outside the 8 heavy modules) drops the `tia` leg to a few seconds, which reads as "it did
+nothing" rather than "it was fast".
 
 **Retuning durations**: the per-file budgets live in `scripts/domain_spec.json` as
 `sleep_seconds` (150s total; 37s of it on `billing.calculator`). Change those and re-run
