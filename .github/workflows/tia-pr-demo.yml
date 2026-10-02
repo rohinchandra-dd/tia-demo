@@ -4,11 +4,21 @@ name: TIA PR Demo
 # Scoped to `preprod` so these are the only two checks on the demo PR.
 # The push leg seeds per-test coverage for demo-tia; without it TIA has nothing
 # to skip against (Datadog does not backfill coverage for Python).
+#
+# The `paths` filter keeps this off the Test Parallelization demo's PR, which
+# also targets `preprod` but touches other domains. For pull_request events
+# GitHub evaluates `paths` against the whole PR diff (a three-dot diff against
+# the merge base), not the latest push — so pushing an empty commit to
+# re-trigger the demo still matches. Do NOT add `paths` to the push trigger:
+# that uses a two-dot diff, where an empty commit changes nothing and the
+# seeding run would silently not fire.
 
 on:
   pull_request:
     branches:
       - preprod
+    paths:
+      - "src/billing/**"
   push:
     branches:
       - preprod
