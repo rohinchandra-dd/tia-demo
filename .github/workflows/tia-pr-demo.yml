@@ -6,7 +6,8 @@ name: TIA PR Demo
 # to skip against (Datadog does not backfill coverage for Python).
 #
 # The `paths` filter keeps this off the Test Parallelization demo's PR, which
-# also targets `preprod` but touches other domains. For pull_request events
+# also targets `preprod` but touches a disjoint set of domains
+# (auth/compliance/notifications/shipping). For pull_request events
 # GitHub evaluates `paths` against the whole PR diff (a three-dot diff against
 # the merge base), not the latest push — so pushing an empty commit to
 # re-trigger the demo still matches. Do NOT add `paths` to the push trigger:
@@ -18,7 +19,10 @@ on:
     branches:
       - preprod
     paths:
-      - "src/billing/**"
+      - "src/analytics/**"
+      - "src/catalog/**"
+      - "src/inventory/**"
+      - "src/shared/**"
   push:
     branches:
       - preprod
@@ -70,12 +74,12 @@ jobs:
         # the ONLY difference between the two legs is DD_CIVISIBILITY_ITR_ENABLED,
         # so node N is directly comparable across them.
         #
-        # For a src/billing/calculator.py change, TIA selects only
-        # tests/billing/test_calculator.py (shard 0, 37s) plus the 5 unskippable
-        # integration tests (shard 2). Shards 1 and 3 therefore run ZERO tests and
-        # finish in seconds. That is the demo, not a bug: TIA removes the work but
-        # leaves it badly distributed, which is what the parallelization demo then
-        # fixes. pytest exits 0 when everything collected is skipped.
+        # The demo change touches analytics/catalog/inventory/shared, which puts
+        # exactly 4 selected test files in EVERY shard -- so each node runs a
+        # similar NUMBER of tests (~48). Only the analytics files carry real
+        # duration (24s each), so node 0 takes ~96s while the rest take ~4s.
+        # That is the point: equal work by count, wildly unequal by duration.
+        # Budgets live in scripts/domain_spec.json.
         run: |
           pytest $(python scripts/shard_by_count.py --shard ${{ matrix.shard }} --nodes 4) \
             --ddtrace -v

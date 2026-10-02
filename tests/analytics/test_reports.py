@@ -1,10 +1,13 @@
 """Tests for analytics.reports — generated; re-run scripts/generate_test_modules.py."""
 
+import time
+
 import pytest
 
 from src.analytics import reports as _module
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize(
     "call_expr",
     [
@@ -26,6 +29,7 @@ from src.analytics import reports as _module
 )
 def test_report_period(call_expr):
     """Execute operation and assert result is usable."""
+    time.sleep(4.0)
     result = eval(call_expr, vars(_module))
     if isinstance(result, bool):
         assert result in (True, False)

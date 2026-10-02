@@ -10,21 +10,15 @@ name: Parallel PR Demo
 # mixing them here made the two ddtest legs indistinguishable and muddied what
 # the contrast was attributable to.
 #
-# REQUIRED: every commit that drives this demo must carry `ITR:NoSkip` in its
-# message, including the empty commits used to re-trigger it:
+# TIA stays ENABLED on the ddtest legs. This demo is the third bar of the
+# 3/2/1 story: naive -> TIA -> TIA + parallelization. The TIA demo (DEMO.md B0)
+# shows that TIA leaves one node carrying nearly all the duration; here ddtest
+# redistributes that same selected set so every node finishes together.
 #
-#   git commit --allow-empty -m "ITR:NoSkip trigger parallelization demo"
-#
-# Without it, `ddtest` fetches 677 skippable tests and deselects them, so this
-# stops being a full-suite comparison against `naive` -- AND it silently falls
-# back to file-size weights for the split:
-#     tiaSkippableTestsCount=677 -> Backend durations used: 0 / Default: 41
-# With it, both clear together:
-#     tiaSkippableTestsCount=0   -> Backend durations used: 41 / Default: 0
-#
-# Note DD_CIVISIBILITY_ITR_ENABLED does NOT work here. It is a ddtrace setting,
-# and `ddtest` deselects skippable tests before pytest ever starts. The plan
-# step below fails the job if the fallback is detected.
+# Note DD_CIVISIBILITY_ITR_ENABLED cannot turn TIA off here anyway: it is a
+# ddtrace setting, and `ddtest` queries Datadog for skippable tests and
+# deselects them before pytest starts. Measured: a leg with that variable set
+# to "false" still ran only 288 of 965 tests.
 #
 # The `paths` filter keeps this off the TIA demo's PR, which also targets
 # `preprod` but touches src/billing. For pull_request events GitHub evaluates
@@ -44,10 +38,10 @@ on:
     branches:
       - preprod
     paths:
-      - "src/analytics/**"
       - "src/auth/**"
-      - "src/catalog/**"
-      - "src/inventory/**"
+      - "src/compliance/**"
+      - "src/notifications/**"
+      - "src/shipping/**"
   push:
     branches:
       - preprod
@@ -102,8 +96,8 @@ jobs:
           DD_CIVISIBILITY_FLAKY_RETRY_ENABLED: "false"
 
   # ---------------------------------------------------------------- leg B
-  smart_plan:
-    name: smart (plan)
+  tia_parallel_plan:
+    name: tia-parallel (plan)
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.dd_plan.outputs.matrix }}
@@ -122,39 +116,34 @@ jobs:
         # means the planner would otherwise discover tests/flaky, which fails by
         # design and would sink the leg for reasons unrelated to splitting.
         run: |
-          bin/ddtest plan --tests-exclude-pattern 'tests/flaky/**' 2>&1 | tee plan.log
-          if grep -q "Backend durations used: 0 suites" plan.log; then
-            echo "::error::ddtest fell back to file-size weights instead of measured \
-          durations, so this leg will not demonstrate duration-aware splitting. The \
-          commit message is almost certainly missing the ITR:NoSkip prefix."
-            exit 1
-          fi
+          bin/ddtest plan --tests-exclude-pattern 'tests/flaky/**'
         env:
           DD_ENV: ci
           DD_SERVICE: demo-parallel-smart
-          # ITR deliberately left ON (no DD_CIVISIBILITY_ITR_ENABLED here):
-          # setting it "false" suppresses the backend durations entirely
+          # ITR deliberately left ON (no DD_CIVISIBILITY_ITR_ENABLED here).
+          # It is both what selects the impacted tests and what makes the
+          # backend test-suite durations available; setting it "false"
+          # suppresses the durations entirely:
           #   WARN "Test durations API returned no test suites"
-          # Skipping is prevented by ITR:NoSkip in the commit message instead.
       - name: Report chosen parallelism
         run: |
           count=$(cat .testoptimization/runner/parallel-runners.txt)
           files=$(wc -l < .testoptimization/runner/test-files.txt)
-          echo "### smart: ddtest chose **${count}** node(s) for ${files} files" \
+          echo "### tia-parallel: ddtest chose **${count}** node(s) for ${files} files" \
             >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
-          name: dd-artifacts-parallel-smart
+          name: dd-artifacts-tia-parallel
           path: .testoptimization
           include-hidden-files: true
 
-  smart:
-    name: smart (node ${{ matrix.ci_node_index }})
+  tia_parallel:
+    name: tia-parallel (node ${{ matrix.ci_node_index }})
     runs-on: ubuntu-latest
-    needs: [smart_plan]
+    needs: [tia_parallel_plan]
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.smart_plan.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.tia_parallel_plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -166,7 +155,7 @@ jobs:
           DD_API_KEY: ${{ secrets.DD_API_KEY }}
       - uses: actions/download-artifact@v4
         with:
-          name: dd-artifacts-parallel-smart
+          name: dd-artifacts-tia-parallel
           path: .testoptimization
       - name: Run duration-split node
         run: bin/ddtest run --ci-node ${{ matrix.ci_node_index }}

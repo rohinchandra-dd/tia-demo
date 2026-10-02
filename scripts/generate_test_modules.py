@@ -398,20 +398,17 @@ def main() -> None:
                 generate_src_module(domain, name, ops),
             )
 
-            # Every heavy module is a slow module. Its whole sleep budget lands on
-            # the first test function, which is what both the TIA and the
-            # parallelization demos are calibrated against.
-            slow = heavy
-            if slow and "sleep_seconds" not in mod:
-                raise ValueError(
-                    f"{domain}.{name} is marked heavy but has no sleep_seconds budget. "
-                    "Add one to scripts/domain_spec.json — without it the module emits "
-                    "time.sleep(0.0) and the demo timings silently shrink."
-                )
+            # Duration is independent of test count. `heavy` controls how many
+            # tests a module emits (72 vs 12); `sleep_seconds` controls how long
+            # they take. The demos need LIGHT modules that are SLOW — a handful
+            # of long tests TIA can select without dragging in most of the suite.
+            # The whole budget lands on the first test function.
+            sleep_seconds = mod.get("sleep_seconds", 0)
+            slow = sleep_seconds > 0
+            if sleep_seconds < 0:
+                raise ValueError(f"{domain}.{name}: sleep_seconds must be >= 0")
 
-            test_content = generate_test_file(
-                domain, name, ops, heavy, slow, mod.get("sleep_seconds", 0.0)
-            )
+            test_content = generate_test_file(domain, name, ops, heavy, slow, sleep_seconds)
             write(ROOT / "tests" / domain / f"test_{name}.py", test_content)
 
             func_count = HEAVY_FUNCTIONS if heavy else LIGHT_FUNCTIONS

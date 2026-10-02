@@ -1,10 +1,13 @@
 """Tests for inventory.cycle_count — generated; re-run scripts/generate_test_modules.py."""
 
+import time
+
 import pytest
 
 from src.inventory import cycle_count as _module
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize(
     "call_expr",
     [
@@ -26,6 +29,7 @@ from src.inventory import cycle_count as _module
 )
 def test_count_variance(call_expr):
     """Execute operation and assert result is usable."""
+    time.sleep(0.167)
     result = eval(call_expr, vars(_module))
     if isinstance(result, bool):
         assert result in (True, False)

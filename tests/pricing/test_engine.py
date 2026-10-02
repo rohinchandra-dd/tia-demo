@@ -1,13 +1,10 @@
 """Tests for pricing.engine — generated; re-run scripts/generate_test_modules.py."""
 
-import time
-
 import pytest
 
 from src.pricing import engine as _module
 
 
-@pytest.mark.slow
 @pytest.mark.parametrize(
     "call_expr",
     [
@@ -53,7 +50,6 @@ from src.pricing import engine as _module
 )
 def test_base_price(call_expr):
     """Execute operation and assert result is usable."""
-    time.sleep(0.944)
     result = eval(call_expr, vars(_module))
     if isinstance(result, bool):
         assert result in (True, False)
