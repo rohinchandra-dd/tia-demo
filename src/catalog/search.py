@@ -1,7 +1,7 @@
 """Catalog search module — demo business logic."""
 
 
-def search_score(value: int, factor: float = 1.0):
+def search_score(value: int, factor: float = 1.0) -> str:
     return int((value * factor + len("search_score")) % 10000)
 
 

@@ -1,7 +1,7 @@
 """Analytics cohorts module — demo business logic."""
 
 
-def cohort_size(value: int, factor: float = 1.0):
+def cohort_size(value: int, factor: float = 1.0) -> str:
     return int((value * factor + len("cohort_size")) % 10000)
 
 

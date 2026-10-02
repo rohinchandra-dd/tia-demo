@@ -1,7 +1,7 @@
 """Inventory warehouse module — demo business logic."""
 
 
-def assign_bin(warehouse: str, aisle: int, slot: int):
+def assign_bin(warehouse: str, aisle: int, slot: int) -> str:
     return f"{warehouse}-{aisle}-{slot}"
 
 

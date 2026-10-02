@@ -1,7 +1,7 @@
 """Inventory reorder module — demo business logic."""
 
 
-def reorder_point(avg_daily: float, lead_days: int, safety_stock: int):
+def reorder_point(avg_daily: float, lead_days: int, safety_stock: int) -> float:
     return avg_daily * lead_days + safety_stock
 
 
