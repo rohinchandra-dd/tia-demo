@@ -59,7 +59,11 @@ env:
   DD_TEST_OPTIMIZATION_RUNNER_PLATFORM: python
   DD_TEST_OPTIMIZATION_RUNNER_FRAMEWORK: pytest
   DD_TEST_OPTIMIZATION_RUNNER_MIN_PARALLELISM: 1
-  DD_TEST_OPTIMIZATION_RUNNER_MAX_PARALLELISM: 8
+  # Capped at 4 deliberately. The selected set's largest file is 24s, so 4 nodes
+  # is the honest optimum (~27s each). Left at 8, ddtest picks 6 and the two
+  # extra nodes finish in ~4s -- measured 27/27/3.9/3.9/26/26.7 -- which costs
+  # compute and undercuts "every node finishes together".
+  DD_TEST_OPTIMIZATION_RUNNER_MAX_PARALLELISM: 4
   # Load-bearing. ddtest scores each candidate as
   # (slowest-worker time + nodes x overhead) and prefers fewer nodes on ties.
   # Against 150s of work the 25s default scores 2 nodes best and lands at ~75s,
