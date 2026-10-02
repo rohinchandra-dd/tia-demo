@@ -2,15 +2,15 @@
   "domains": {
     "billing": {
       "modules": [
-        {"name": "calculator", "operations": ["add_tax", "apply_discount", "round_currency", "split_payment"], "heavy": true},
-        {"name": "invoicing", "operations": ["generate_invoice_id", "format_line_item", "sum_line_items", "validate_invoice"], "heavy": true},
+        {"name": "calculator", "operations": ["add_tax", "apply_discount", "round_currency", "split_payment"], "heavy": true, "sleep_seconds": 37},
+        {"name": "invoicing", "operations": ["generate_invoice_id", "format_line_item", "sum_line_items", "validate_invoice"], "heavy": true, "sleep_seconds": 16},
         {"name": "discounts", "operations": ["apply_coupon", "tier_discount", "bulk_discount", "validate_promo"]},
         {"name": "refunds", "operations": ["calculate_refund", "partial_refund", "refund_eligible", "format_refund"]}
       ]
     },
     "inventory": {
       "modules": [
-        {"name": "stock", "operations": ["check_stock", "reserve_stock", "release_stock", "stock_level"], "heavy": true},
+        {"name": "stock", "operations": ["check_stock", "reserve_stock", "release_stock", "stock_level"], "heavy": true, "sleep_seconds": 16},
         {"name": "warehouse", "operations": ["assign_bin", "locate_item", "transfer_stock", "warehouse_capacity"]},
         {"name": "reorder", "operations": ["reorder_point", "suggest_quantity", "lead_time_days", "reorder_priority"]},
         {"name": "cycle_count", "operations": ["count_variance", "adjust_count", "schedule_count", "count_accuracy"]}
@@ -18,7 +18,7 @@
     },
     "shipping": {
       "modules": [
-        {"name": "rates", "operations": ["calculate_rate", "zone_rate", "weight_tier", "express_surcharge"], "heavy": true},
+        {"name": "rates", "operations": ["calculate_rate", "zone_rate", "weight_tier", "express_surcharge"], "heavy": true, "sleep_seconds": 16},
         {"name": "tracking", "operations": ["track_status", "eta_estimate", "format_tracking_id", "delivery_window"]},
         {"name": "labels", "operations": ["generate_label", "validate_address", "package_dimensions", "label_format"]},
         {"name": "carriers", "operations": ["select_carrier", "carrier_score", "cutoff_time", "service_level"]}
@@ -26,7 +26,7 @@
     },
     "auth": {
       "modules": [
-        {"name": "permissions", "operations": ["has_permission", "merge_roles", "role_hierarchy", "permission_mask"], "heavy": true},
+        {"name": "permissions", "operations": ["has_permission", "merge_roles", "role_hierarchy", "permission_mask"], "heavy": true, "sleep_seconds": 16},
         {"name": "tokens", "operations": ["generate_token", "validate_token", "token_expiry", "refresh_token"]},
         {"name": "sessions", "operations": ["create_session", "revoke_session", "session_ttl", "active_sessions"]},
         {"name": "mfa", "operations": ["generate_otp", "verify_otp", "backup_codes", "mfa_required"]}
@@ -42,7 +42,7 @@
     },
     "catalog": {
       "modules": [
-        {"name": "products", "operations": ["product_sku", "merge_attributes", "product_title", "variant_count"], "heavy": true},
+        {"name": "products", "operations": ["product_sku", "merge_attributes", "product_title", "variant_count"], "heavy": true, "sleep_seconds": 16},
         {"name": "categories", "operations": ["category_path", "parent_category", "leaf_categories", "category_depth"]},
         {"name": "search", "operations": ["search_score", "tokenize_query", "normalize_query", "rank_results"]},
         {"name": "media", "operations": ["image_url", "alt_text", "media_type", "thumbnail_size"]}
@@ -50,7 +50,7 @@
     },
     "pricing": {
       "modules": [
-        {"name": "engine", "operations": ["base_price", "margin_price", "competitor_adjust", "price_floor"], "heavy": true},
+        {"name": "engine", "operations": ["base_price", "margin_price", "competitor_adjust", "price_floor"], "heavy": true, "sleep_seconds": 17},
         {"name": "rules", "operations": ["apply_rule", "rule_priority", "match_conditions", "rule_stack"]},
         {"name": "currency", "operations": ["convert_currency", "exchange_rate", "round_fx", "currency_symbol"]},
         {"name": "bundles", "operations": ["bundle_price", "bundle_discount", "bundle_items", "bundle_valid"]}
@@ -66,7 +66,7 @@
     },
     "analytics": {
       "modules": [
-        {"name": "metrics", "operations": ["aggregate_sum", "aggregate_avg", "percentile", "growth_rate"], "heavy": true},
+        {"name": "metrics", "operations": ["aggregate_sum", "aggregate_avg", "percentile", "growth_rate"], "heavy": true, "sleep_seconds": 16},
         {"name": "reports", "operations": ["report_period", "report_title", "row_count", "column_total"]},
         {"name": "funnels", "operations": ["funnel_step", "conversion_rate", "drop_off", "funnel_duration"]},
         {"name": "cohorts", "operations": ["cohort_size", "retention_rate", "cohort_period", "cohort_label"]}

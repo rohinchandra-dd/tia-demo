@@ -2,6 +2,8 @@ name: CI - PR Validation
 
 on:
   pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 env:

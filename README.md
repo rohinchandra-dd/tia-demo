@@ -9,8 +9,10 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-# Regenerate domain tests after editing scripts/domain_spec.json
-python scripts/generate_test_modules.py
+# Regenerate domain tests after editing scripts/domain_spec.json.
+# The generator emits unformatted code, so always format afterwards or the
+# PR Validation lint job fails and the diff looks far larger than it is.
+python scripts/generate_test_modules.py && ruff format src tests scripts
 
 # Run tests locally (skip slow tests for speed)
 pytest -m "not slow" -q
@@ -36,7 +38,7 @@ Each workflow appears as a separate pipeline in [Datadog CI Visibility](https://
 | Pipeline | Workflow | Trigger | Demo focus |
 | --- | --- | --- | --- |
 | Quick Smoke | `ci-quick-smoke.yml` | push to `main`, manual | Fast feedback (~1 min), populates Datadog quickly |
-| PR Validation | `ci-pr-validation.yml` | `pull_request` | Job DAG, TIA on PRs, smoke tests |
+| PR Validation | `ci-pr-validation.yml` | PRs into `main` | Job DAG, TIA on PRs, smoke tests |
 | Main Build | `ci-main-build.yml` | push to `main` | Sequential stages, deploy gate, auto retries |
 | Nightly Regression | `ci-nightly-regression.yml` | cron + manual | Scheduled CI, ddtest parallelization |
 | Hotfix Fast Path | `ci-hotfix-fast-path.yml` | manual | TIA + parallel on demand |
@@ -45,6 +47,7 @@ Each workflow appears as a separate pipeline in [Datadog CI Visibility](https://
 | Test Impact Analysis | `test-impact-analysis.yml` | manual / `demo/**` | TIA only |
 | Test Parallelization | `test-parallelization.yml` | manual / `demo/**` | ddtest matrix only |
 | Test Optimized | `test-optimized.yml` | manual / `demo/**` | TIA + parallel combined |
+| **TIA PR Demo** | `tia-pr-demo.yml` | PRs into `preprod` | **Baseline vs TIA, side by side on one PR** |
 
 ### Test services (`DD_SERVICE`)
 
@@ -93,7 +96,7 @@ See [DEMO.md](DEMO.md) for step-by-step demo scripts.
 
 - **~970 tests** across 40 domain test files (regenerate for more via `domain_spec.json`)
 - **TIA mapping**: `tests/billing/test_calculator.py` ↔ `src/billing/calculator.py`
-- **Slow tests**: `@pytest.mark.slow` on heavy modules (~2–6s each) for parallelization demos
+- **Slow tests**: `@pytest.mark.slow` on 8 heavy modules; per-file budgets set by `sleep_seconds` in `domain_spec.json` (150s total, deterministic)
 - **Unskippable**: `tests/integration/test_data_driven.py` reads `fixtures/`
 - **Flaky demos**: `tests/flaky/` — retry-recoverable, intermittent, and EFD scenarios
 

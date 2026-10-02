@@ -324,6 +324,7 @@ def generate_test_file(
     operations: list[str],
     heavy: bool,
     slow: bool,
+    sleep_seconds: float = 0.0,
 ) -> str:
     func_count = HEAVY_FUNCTIONS if heavy else LIGHT_FUNCTIONS
     param_count = HEAVY_PARAM_COUNT if heavy else LIGHT_PARAM_COUNT
@@ -360,7 +361,8 @@ def generate_test_file(
         lines.append(f"def test_{op}(call_expr):")
         lines.append('    """Execute operation and assert result is usable."""')
         if idx == 0 and slow:
-            lines.append("    time.sleep(2 + (hash(call_expr) % 4))")
+            # Fixed per-case delay so suite duration is reproducible run to run.
+            lines.append(f"    time.sleep({round(sleep_seconds / param_count, 3)})")
         lines.append("    result = eval(call_expr, vars(_module))")
         lines.append("    if isinstance(result, bool):")
         lines.append("        assert result in (True, False)")
@@ -401,7 +403,9 @@ def main() -> None:
             if slow:
                 slow_domains_used += 1
 
-            test_content = generate_test_file(domain, name, ops, heavy, slow)
+            test_content = generate_test_file(
+                domain, name, ops, heavy, slow, mod.get("sleep_seconds", 0.0)
+            )
             write(ROOT / "tests" / domain / f"test_{name}.py", test_content)
 
             func_count = HEAVY_FUNCTIONS if heavy else LIGHT_FUNCTIONS

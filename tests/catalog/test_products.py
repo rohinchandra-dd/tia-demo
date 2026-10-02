@@ -53,7 +53,7 @@ from src.catalog import products as _module
 )
 def test_product_sku(call_expr):
     """Execute operation and assert result is usable."""
-    time.sleep(2 + (hash(call_expr) % 4))
+    time.sleep(0.889)
     result = eval(call_expr, vars(_module))
     if isinstance(result, bool):
         assert result in (True, False)

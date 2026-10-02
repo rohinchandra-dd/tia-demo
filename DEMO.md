@@ -53,11 +53,54 @@ Step-by-step scenarios for demonstrating Datadog CI/CD Optimization and Test Opt
 
 ## Part B: Test Optimization (~10 min)
 
+### B0 — TIA side by side on a single PR (primary TIA demo)
+
+One PR, exactly two checks, both running the same 972-test suite:
+
+| Job | TIA | Tests run | Duration |
+| --- | --- | --- | --- |
+| `baseline` | disabled | 965 | ~2m 30s |
+| `tia` | enabled | ~23 | ~40s |
+
+**Setup (once):**
+1. `preprod` branch exists and is **not** protected — this is what keeps the PR Signals
+   required checks (`fast-test-job`, `slow-build-job`) off this PR.
+2. In CI/CD Settings -> Repositories, add `preprod` to the Test Impact Analysis
+   **excluded branches** list. Excluded branches still collect per-test coverage but never
+   skip, which is exactly what makes `preprod` a valid seeding branch. Datadog does not
+   backfill coverage for Python, so without this the `tia` job has nothing to skip against.
+3. Push to `preprod` once and let `TIA PR Demo` run. That run executes the full suite and
+   seeds coverage. **Do not demo on this run** — it correctly skips nothing.
+
+**Run the demo:**
+```bash
+git checkout preprod && git pull
+git checkout -b tia/add-tax-fix          # must NOT match demo/** or 4 extra workflows fire
+# change one line inside add_tax() in src/billing/calculator.py
+git commit -am "fix: billing tax rounding"
+git push -u origin tia/add-tax-fix
+gh pr create --base preprod
+```
+
+**Talking points**: both jobs run the identical pytest command on the identical commit — the
+only difference is `DD_CIVISIBILITY_ITR_ENABLED`. TIA selected the 18 `test_add_tax` cases
+that actually cover the changed line, plus the unskippable integration tests, and skipped the
+rest. Compare `demo-baseline` and `demo-tia` in Test Runs for the purple savings bar.
+
+**The edit must be to `add_tax`.** It is the only function in `calculator.py` covered by the
+slow (sleeping) tests; editing `apply_discount`, `round_currency`, or `split_payment` selects
+18 fast tests instead and the contrast disappears.
+
+**Retuning durations**: the per-file budgets live in `scripts/domain_spec.json` as
+`sleep_seconds` (150s total; 37s of it on `billing.calculator`). Change those and re-run
+`python scripts/generate_test_modules.py && ruff format src tests scripts`. Never hand-edit
+the generated test files — the next regeneration reverts them.
+
 ### B1 — Baseline pain
 
 1. Run **Test - Baseline** (`workflow_dispatch`)
 2. Open Test Runs for service `demo-baseline`
-3. Note ~970 tests, ~15–25 min duration, no purple TIA savings bar
+3. Note ~970 tests, ~2m 30s duration, no purple TIA savings bar
 
 ### B2 — Test Impact Analysis
 

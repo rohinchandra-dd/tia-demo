@@ -1,0 +1,51 @@
+name: TIA PR Demo
+
+# Side-by-side contrast of the same suite with and without Test Impact Analysis.
+# Scoped to `preprod` so these are the only two checks on the demo PR.
+# The push leg seeds per-test coverage for demo-tia; without it TIA has nothing
+# to skip against (Datadog does not backfill coverage for Python).
+
+on:
+  pull_request:
+    branches:
+      - preprod
+  push:
+    branches:
+      - preprod
+
+env:
+  DD_ENV: ci
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-demo
+        env:
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+      - name: Run full suite without Test Impact Analysis
+        run: pytest tests/ --ignore=tests/flaky --ddtrace -v
+        env:
+          DD_ENV: ci
+          DD_SERVICE: demo-baseline
+          DD_CIVISIBILITY_ITR_ENABLED: "false"
+          DD_CIVISIBILITY_FLAKY_RETRY_ENABLED: "false"
+
+  tia:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-demo
+        env:
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+      - name: Run same suite with Test Impact Analysis
+        run: pytest tests/ --ignore=tests/flaky --ddtrace -v
+        env:
+          DD_ENV: ci
+          DD_SERVICE: demo-tia
+          DD_CIVISIBILITY_FLAKY_RETRY_ENABLED: "false"
