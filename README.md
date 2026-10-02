@@ -26,7 +26,7 @@ pytest -q
 | Path | Purpose |
 | --- | --- |
 | `src/` | 10 domain packages, ~40 pure-function modules |
-| `tests/` | ~970 parametrized tests + integration + flaky demos |
+| `tests/` | 972 tests: 960 parametrized domain + 5 integration + 7 flaky demos |
 | `tests/flaky/` | Controlled flaky tests for retry/detection demos |
 | `scripts/generate_test_modules.py` | Regenerates src + tests from `domain_spec.json` |
 | `.github/workflows/` | 10 GitHub Actions pipelines (+ seed orchestrator) |
@@ -77,8 +77,8 @@ In [CI/CD Optimization → Settings → Repositories](https://app.datadoghq.com/
 
 | Setting | Recommended value |
 | --- | --- |
-| Test Impact Analysis | Enabled; exclude `main` |
-| Tracked files | `requirements.txt`, `pyproject.toml`, `scripts/generate_test_modules.py` |
+| Test Impact Analysis | Enabled; exclude `main` **and `preprod`** (see DEMO.md B0) |
+| Tracked files | `requirements.txt`, `pyproject.toml`, `scripts/generate_test_modules.py` — a PR touching any of these forces a full run |
 | Auto Test Retries | Enabled for `demo-main-build`, `demo-pr-validation` |
 | Early Flake Detection | Enabled for `demo-pr-validation` |
 
@@ -94,7 +94,8 @@ See [DEMO.md](DEMO.md) for step-by-step demo scripts.
 
 ## Test suite highlights
 
-- **~970 tests** across 40 domain test files (regenerate for more via `domain_spec.json`)
+- **972 tests**: 960 parametrized across 40 domain test files, 5 integration, 7 flaky.
+  Demo workflows pass `--ignore=tests/flaky`, so they run **965** (regenerate for more via `domain_spec.json`)
 - **TIA mapping**: `tests/billing/test_calculator.py` ↔ `src/billing/calculator.py`
 - **Slow tests**: `@pytest.mark.slow` on 8 heavy modules; per-file budgets set by `sleep_seconds` in `domain_spec.json` (150s total, deterministic)
 - **Unskippable**: `tests/integration/test_data_driven.py` reads `fixtures/`

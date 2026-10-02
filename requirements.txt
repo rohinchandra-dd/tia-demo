@@ -1,4 +1,7 @@
-pytest>=7.2.0
-ddtrace>=4.11.0
-coverage>=5.5
-ruff>=0.8.0
+# Pinned exactly. This file is a Datadog *tracked file*: changing it forces a
+# full test run on any PR that touches it, which would flatten the TIA demo
+# contrast. Land version bumps on the trunk, never inside a demo PR.
+pytest==9.1.1
+ddtrace==4.13.0
+coverage==7.15.4
+ruff==0.16.2

@@ -55,7 +55,8 @@ Step-by-step scenarios for demonstrating Datadog CI/CD Optimization and Test Opt
 
 ### B0 — TIA side by side on a single PR (primary TIA demo)
 
-One PR, exactly two checks, both running the same 972-test suite:
+One PR, exactly two checks, both running the same suite — 965 tests (972 minus the 7
+flaky demo tests, which both legs `--ignore`):
 
 | Job | TIA | Tests run | Test time | Job time |
 | --- | --- | --- | --- | --- |
@@ -118,13 +119,15 @@ the generated test files — the next regeneration reverts them.
 
 1. Run **Test - Baseline** (`workflow_dispatch`)
 2. Open Test Runs for service `demo-baseline`
-3. Note ~970 tests, ~2m 30s duration, no purple TIA savings bar
+3. Note 965 tests, ~2m 32s duration, no purple TIA savings bar
 
 ### B2 — Test Impact Analysis
 
 1. On branch `demo/tia-billing-fix`, change one line in `src/billing/calculator.py`
 2. Run **Test - Impact Analysis** or push to `demo/tia-billing-fix`
-3. Show ~60 tests run (calculator file only), purple savings in Test Runs
+3. Show ~77 tests run — the 72 in `test_calculator.py` plus 5 unskippable integration
+   tests — and purple savings in Test Runs. This workflow does not `--ignore=tests/flaky`,
+   so a few flaky tests land on top; B0 is the measured, reproducible version of this number.
 
 **Optional**: Add `ITR:NoSkip` to commit message to force full suite.
 
