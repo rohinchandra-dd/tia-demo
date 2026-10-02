@@ -69,10 +69,15 @@ is where the 3.8x difference actually lives.
 **Setup (once):**
 1. `preprod` branch exists and is **not** protected — this is what keeps the PR Signals
    required checks (`fast-test-job`, `slow-build-job`) off this PR.
-2. In CI/CD Settings -> Repositories, add `preprod` to the Test Impact Analysis
+2. **Required.** In CI/CD Settings -> Repositories, add `preprod` to the Test Impact Analysis
    **excluded branches** list. Excluded branches still collect per-test coverage but never
-   skip, which is exactly what makes `preprod` a valid seeding branch. Datadog does not
-   backfill coverage for Python, so without this the `tia` job has nothing to skip against.
+   skip, which is what makes `preprod` a valid seeding branch. Datadog does not backfill
+   coverage for Python, so coverage only exists where a full run produced it.
+
+   **Symptom if this is not set:** a push to `preprod` logs something like
+   `5 passed, 960 skipped in 2.54s` — it skipped instead of re-seeding, so coverage goes
+   stale and later demo PRs gradually stop skipping. A correct seed run logs
+   `965 passed in ~2m32s`.
 3. Push to `preprod` once and let `TIA PR Demo` run. That run executes the full suite and
    seeds coverage. **Do not demo on this run** — it correctly skips nothing.
 
