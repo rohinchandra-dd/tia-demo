@@ -10,14 +10,21 @@ name: Parallel PR Demo
 # mixing them here made the two ddtest legs indistinguishable and muddied what
 # the contrast was attributable to.
 #
-# REQUIRED: the demo branch must be in Datadog's TIA excluded-branches list.
-# Measured across five runs: on `preprod` (excluded) ddtest reports
-#   Backend durations used: 41 suites
-# while on a non-excluded branch it reports
-#   Backend durations used: 0 / Default durations used: 41
-# and falls back to file-size weights, which are uncorrelated with this
-# suite's sleeps. On a non-excluded branch TIA also skips 677 tests, so the
-# leg stops being a full-suite comparison against `naive`.
+# REQUIRED: every commit that drives this demo must carry `ITR:NoSkip` in its
+# message, including the empty commits used to re-trigger it:
+#
+#   git commit --allow-empty -m "ITR:NoSkip trigger parallelization demo"
+#
+# Without it, `ddtest` fetches 677 skippable tests and deselects them, so this
+# stops being a full-suite comparison against `naive` -- AND it silently falls
+# back to file-size weights for the split:
+#     tiaSkippableTestsCount=677 -> Backend durations used: 0 / Default: 41
+# With it, both clear together:
+#     tiaSkippableTestsCount=0   -> Backend durations used: 41 / Default: 0
+#
+# Note DD_CIVISIBILITY_ITR_ENABLED does NOT work here. It is a ddtrace setting,
+# and `ddtest` deselects skippable tests before pytest ever starts. The plan
+# step below fails the job if the fallback is detected.
 #
 # The `paths` filter keeps this off the TIA demo's PR, which also targets
 # `preprod` but touches src/billing. For pull_request events GitHub evaluates
@@ -82,18 +89,12 @@ jobs:
         env:
           DD_API_KEY: ${{ secrets.DD_API_KEY }}
       - name: Run shard split by file count
-        # Deliberately the sharding most teams hand-roll: 41 files chopped into
-        # four equal-COUNT contiguous chunks, with no idea what each one costs.
-        # Verified to partition all 41 files with no overlap, at 69/32/16/33s.
+        # The same count-based split the TIA demo uses, so node times are
+        # directly comparable across the two demos. 41 files chopped into four
+        # equal-COUNT chunks with no idea what each costs: 69/32/16/33s.
         run: |
-          FILES=()
-          while IFS= read -r f; do FILES+=("$f"); done \
-            < <(find tests -name 'test_*.py' -not -path 'tests/flaky/*' | sort)
-          T=${#FILES[@]}; N=4; I=${{ matrix.shard }}
-          S=$(( I * T / N )); E=$(( (I + 1) * T / N ))
-          echo "shard $I/$N: $((E - S)) of $T files"
-          printf '  %s\n' "${FILES[@]:S:E-S}"
-          pytest "${FILES[@]:S:E-S}" --ddtrace -v
+          pytest $(python scripts/shard_by_count.py --shard ${{ matrix.shard }} --nodes 4) \
+            --ddtrace -v
         env:
           DD_ENV: ci
           DD_SERVICE: demo-parallel-naive
@@ -121,17 +122,20 @@ jobs:
         # means the planner would otherwise discover tests/flaky, which fails by
         # design and would sink the leg for reasons unrelated to splitting.
         run: |
-          bin/ddtest plan --tests-exclude-pattern 'tests/flaky/**'
+          bin/ddtest plan --tests-exclude-pattern 'tests/flaky/**' 2>&1 | tee plan.log
+          if grep -q "Backend durations used: 0 suites" plan.log; then
+            echo "::error::ddtest fell back to file-size weights instead of measured \
+          durations, so this leg will not demonstrate duration-aware splitting. The \
+          commit message is almost certainly missing the ITR:NoSkip prefix."
+            exit 1
+          fi
         env:
           DD_ENV: ci
           DD_SERVICE: demo-parallel-smart
-          # ITR is deliberately left ON (no DD_CIVISIBILITY_ITR_ENABLED here).
-          # It is what makes the backend test-suite durations available, and
-          # setting it to "false" measurably produced
+          # ITR deliberately left ON (no DD_CIVISIBILITY_ITR_ENABLED here):
+          # setting it "false" suppresses the backend durations entirely
           #   WARN "Test durations API returned no test suites"
-          # Skipping is prevented by the branch being TIA-excluded, not by this
-          # variable -- DD_CIVISIBILITY_ITR_ENABLED is a ddtrace setting and does
-          # not reach the ddtest planner, which fetches skippables itself.
+          # Skipping is prevented by ITR:NoSkip in the commit message instead.
       - name: Report chosen parallelism
         run: |
           count=$(cat .testoptimization/runner/parallel-runners.txt)

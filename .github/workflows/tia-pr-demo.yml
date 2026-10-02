@@ -28,7 +28,12 @@ env:
 
 jobs:
   baseline:
+    name: baseline (node ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,8 +41,10 @@ jobs:
       - uses: ./.github/actions/setup-demo
         env:
           DD_API_KEY: ${{ secrets.DD_API_KEY }}
-      - name: Run full suite without Test Impact Analysis
-        run: pytest tests/ --ignore=tests/flaky --ddtrace -v
+      - name: Run shard without Test Impact Analysis
+        run: |
+          pytest $(python scripts/shard_by_count.py --shard ${{ matrix.shard }} --nodes 4) \
+            --ddtrace -v
         env:
           DD_ENV: ci
           DD_SERVICE: demo-baseline
@@ -45,7 +52,12 @@ jobs:
           DD_CIVISIBILITY_FLAKY_RETRY_ENABLED: "false"
 
   tia:
+    name: tia (node ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -53,8 +65,20 @@ jobs:
       - uses: ./.github/actions/setup-demo
         env:
           DD_API_KEY: ${{ secrets.DD_API_KEY }}
-      - name: Run same suite with Test Impact Analysis
-        run: pytest tests/ --ignore=tests/flaky --ddtrace -v
+      - name: Run same shard with Test Impact Analysis
+        # Identical command and identical shard boundaries to `baseline` above —
+        # the ONLY difference between the two legs is DD_CIVISIBILITY_ITR_ENABLED,
+        # so node N is directly comparable across them.
+        #
+        # For a src/billing/calculator.py change, TIA selects only
+        # tests/billing/test_calculator.py (shard 0, 37s) plus the 5 unskippable
+        # integration tests (shard 2). Shards 1 and 3 therefore run ZERO tests and
+        # finish in seconds. That is the demo, not a bug: TIA removes the work but
+        # leaves it badly distributed, which is what the parallelization demo then
+        # fixes. pytest exits 0 when everything collected is skipped.
+        run: |
+          pytest $(python scripts/shard_by_count.py --shard ${{ matrix.shard }} --nodes 4) \
+            --ddtrace -v
         env:
           DD_ENV: ci
           DD_SERVICE: demo-tia
