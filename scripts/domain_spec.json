@@ -2,9 +2,9 @@
   "domains": {
     "billing": {
       "modules": [
-        {"name": "calculator", "operations": ["add_tax", "apply_discount", "round_currency", "split_payment"], "heavy": true, "sleep_seconds": 28},
+        {"name": "calculator", "operations": ["add_tax", "apply_discount", "round_currency", "split_payment"], "heavy": true, "sleep_seconds": 25},
         {"name": "invoicing", "operations": ["generate_invoice_id", "format_line_item", "sum_line_items", "validate_invoice"], "heavy": true, "sleep_seconds": 0},
-        {"name": "discounts", "operations": ["apply_coupon", "tier_discount", "bulk_discount", "validate_promo"], "heavy": true, "sleep_seconds": 28},
+        {"name": "discounts", "operations": ["apply_coupon", "tier_discount", "bulk_discount", "validate_promo"], "heavy": true, "sleep_seconds": 25},
         {"name": "refunds", "operations": ["calculate_refund", "partial_refund", "refund_eligible", "format_refund"], "heavy": true, "sleep_seconds": 0}
       ]
     },
@@ -66,18 +66,18 @@
     },
     "analytics": {
       "modules": [
-        {"name": "metrics", "operations": ["aggregate_sum", "aggregate_avg", "percentile", "growth_rate"], "sleep_seconds": 24},
-        {"name": "reports", "operations": ["report_period", "report_title", "row_count", "column_total"], "sleep_seconds": 24},
-        {"name": "funnels", "operations": ["funnel_step", "conversion_rate", "drop_off", "funnel_duration"], "sleep_seconds": 24},
-        {"name": "cohorts", "operations": ["cohort_size", "retention_rate", "cohort_period", "cohort_label"], "sleep_seconds": 24}
+        {"name": "metrics", "operations": ["aggregate_sum", "aggregate_avg", "percentile", "growth_rate"], "sleep_seconds": 34},
+        {"name": "reports", "operations": ["report_period", "report_title", "row_count", "column_total"], "sleep_seconds": 34},
+        {"name": "funnels", "operations": ["funnel_step", "conversion_rate", "drop_off", "funnel_duration"], "sleep_seconds": 34},
+        {"name": "cohorts", "operations": ["cohort_size", "retention_rate", "cohort_period", "cohort_label"], "sleep_seconds": 34}
       ]
     },
     "compliance": {
       "modules": [
-        {"name": "audit", "operations": ["audit_entry", "audit_hash", "audit_timestamp", "audit_actor"], "sleep_seconds": 24},
-        {"name": "retention", "operations": ["retention_days", "purge_eligible", "archive_date", "retention_policy"], "sleep_seconds": 24},
-        {"name": "privacy", "operations": ["mask_pii", "consent_required", "data_category", "anonymize_field"], "sleep_seconds": 24},
-        {"name": "exports", "operations": ["export_format", "export_row", "export_header", "export_valid"], "sleep_seconds": 24}
+        {"name": "audit", "operations": ["audit_entry", "audit_hash", "audit_timestamp", "audit_actor"], "sleep_seconds": 34},
+        {"name": "retention", "operations": ["retention_days", "purge_eligible", "archive_date", "retention_policy"], "sleep_seconds": 34},
+        {"name": "privacy", "operations": ["mask_pii", "consent_required", "data_category", "anonymize_field"], "sleep_seconds": 34},
+        {"name": "exports", "operations": ["export_format", "export_row", "export_header", "export_valid"], "sleep_seconds": 34}
       ]
     }
   }

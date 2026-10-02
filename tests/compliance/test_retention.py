@@ -29,7 +29,7 @@ from src.compliance import retention as _module
 )
 def test_retention_days(call_expr):
     """Execute operation and assert result is usable."""
-    time.sleep(4.0)
+    time.sleep(5.667)
     result = eval(call_expr, vars(_module))
     if isinstance(result, bool):
         assert result in (True, False)
