@@ -26,24 +26,11 @@ jobs:
         with:
           ref: ${{ inputs.branch }}
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/setup-demo
         with:
-          python-version: "3.12"
-          cache: pip
-      - run: python -m pip install -r requirements.txt
-      - uses: datadog/test-visibility-github-action@v3
-        with:
-          languages: python
-          api_key: ${{ secrets.DD_API_KEY }}
-          site: datadoghq.com
-      - name: Download ddtest binary
-        run: |
-          mkdir -p bin
-          gh release download --repo DataDog/ddtest --pattern "ddtest-linux-amd64" --dir bin
-          mv bin/ddtest-linux-amd64 bin/ddtest
-          chmod +x bin/ddtest
+          install_ddtest: "true"
         env:
-          GH_TOKEN: ${{ github.token }}
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
       - id: dd_plan
         name: Plan optimized test execution
         run: bin/ddtest plan
@@ -67,24 +54,11 @@ jobs:
         with:
           ref: ${{ inputs.branch }}
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: ./.github/actions/setup-demo
         with:
-          python-version: "3.12"
-          cache: pip
-      - run: python -m pip install -r requirements.txt
-      - uses: datadog/test-visibility-github-action@v3
-        with:
-          languages: python
-          api_key: ${{ secrets.DD_API_KEY }}
-          site: datadoghq.com
-      - name: Download ddtest binary
-        run: |
-          mkdir -p bin
-          gh release download --repo DataDog/ddtest --pattern "ddtest-linux-amd64" --dir bin
-          mv bin/ddtest-linux-amd64 bin/ddtest
-          chmod +x bin/ddtest
+          install_ddtest: "true"
         env:
-          GH_TOKEN: ${{ github.token }}
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
       - uses: actions/download-artifact@v4
         with:
           name: dd-artifacts-hotfix

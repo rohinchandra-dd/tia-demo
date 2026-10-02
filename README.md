@@ -43,8 +43,8 @@ Each workflow appears as a separate pipeline in [Datadog CI Visibility](https://
 | Nightly Regression | `ci-nightly-regression.yml` | cron + manual | Scheduled CI, ddtest parallelization |
 | Hotfix Fast Path | `ci-hotfix-fast-path.yml` | manual | TIA + parallel on demand |
 | **Seed Datadog Data** | `ci-seed-datadog.yml` | manual | **One-click: triggers all seed workflows** |
-| Test Baseline | `test-baseline.yml` | manual / `demo/**` | Full suite, no optimization |
-| Test Impact Analysis | `test-impact-analysis.yml` | manual / `demo/**` | TIA only |
+| Test Baseline | `test-baseline.yml` | manual / `demo/**` | _Seeding only_ — superseded as a demo by TIA PR Demo |
+| Test Impact Analysis | `test-impact-analysis.yml` | manual / `demo/**` | _Seeding only_ — superseded as a demo by TIA PR Demo |
 | Test Parallelization | `test-parallelization.yml` | manual / `demo/**` | ddtest matrix only |
 | Test Optimized | `test-optimized.yml` | manual / `demo/**` | TIA + parallel combined |
 | **TIA PR Demo** | `tia-pr-demo.yml` | PRs into `preprod` | **Baseline vs TIA, side by side on one PR** |

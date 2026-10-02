@@ -6,7 +6,7 @@ Step-by-step scenarios for demonstrating Datadog CI/CD Optimization and Test Opt
 
 - [ ] `DD_API_KEY` configured as GitHub secret
 - [ ] GitHub App installed with CI Visibility enabled
-- [ ] Test Impact Analysis enabled (exclude `main`)
+- [ ] Test Impact Analysis enabled (exclude `main` **and `preprod`** — see B0)
 - [ ] Auto Test Retries enabled for `demo-main-build`
 - [ ] Early Flake Detection enabled for `demo-pr-validation`
 - [ ] Run **CI - Seed Datadog Data** workflow (or manual steps below)
@@ -110,36 +110,23 @@ function you touch in that file. Editing a module with no `sleep_seconds` budget
 outside the 8 heavy modules) drops the `tia` leg to a few seconds, which reads as "it did
 nothing" rather than "it was fast".
 
+**Optional**: add `ITR:NoSkip` to the commit message to force the full suite even on the
+`tia` leg — useful for showing that the skipping is opt-out, not magic.
+
 **Retuning durations**: the per-file budgets live in `scripts/domain_spec.json` as
 `sleep_seconds` (150s total; 37s of it on `billing.calculator`). Change those and re-run
 `python scripts/generate_test_modules.py && ruff format src tests scripts`. Never hand-edit
 the generated test files — the next regeneration reverts them.
 
-### B1 — Baseline pain
-
-1. Run **Test - Baseline** (`workflow_dispatch`)
-2. Open Test Runs for service `demo-baseline`
-3. Note 965 tests, ~2m 32s duration, no purple TIA savings bar
-
-### B2 — Test Impact Analysis
-
-1. On branch `demo/tia-billing-fix`, change one line in `src/billing/calculator.py`
-2. Run **Test - Impact Analysis** or push to `demo/tia-billing-fix`
-3. Show ~77 tests run — the 72 in `test_calculator.py` plus 5 unskippable integration
-   tests — and purple savings in Test Runs. This workflow does not `--ignore=tests/flaky`,
-   so a few flaky tests land on top; B0 is the measured, reproducible version of this number.
-
-**Optional**: Add `ITR:NoSkip` to commit message to force full suite.
-
-### B3 — Test Parallelization
+### B1 — Test Parallelization
 
 1. Run **Test - Parallelization** on `main`
 2. Show 4–8 parallel matrix jobs
 3. Compare total wall-clock to baseline
 
-### B4 — Combined optimization
+### B2 — Combined optimization
 
-1. Same billing change as B2
+1. Same billing change as B0
 2. Run **Test - Optimized**
 3. Show minimal tests + minimal nodes → ~1–2 min total
 

@@ -380,7 +380,6 @@ def generate_package_init(domain: str) -> str:
 def main() -> None:
     spec = load_spec()
     heavy_count = 0
-    slow_domains_used = 0
     total_tests = 0
     file_count = 0
 
@@ -399,9 +398,16 @@ def main() -> None:
                 generate_src_module(domain, name, ops),
             )
 
-            slow = slow_domains_used < 10 and heavy
-            if slow:
-                slow_domains_used += 1
+            # Every heavy module is a slow module. Its whole sleep budget lands on
+            # the first test function, which is what both the TIA and the
+            # parallelization demos are calibrated against.
+            slow = heavy
+            if slow and "sleep_seconds" not in mod:
+                raise ValueError(
+                    f"{domain}.{name} is marked heavy but has no sleep_seconds budget. "
+                    "Add one to scripts/domain_spec.json — without it the module emits "
+                    "time.sleep(0.0) and the demo timings silently shrink."
+                )
 
             test_content = generate_test_file(
                 domain, name, ops, heavy, slow, mod.get("sleep_seconds", 0.0)
