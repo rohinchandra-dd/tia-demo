@@ -3,9 +3,21 @@ name: Parallel PR Demo
 # Three-way contrast of the SAME suite on the SAME commit, differing only in how
 # test files are distributed across nodes:
 #
-#   naive      4 fixed nodes, split by file COUNT       -> slowest node ~69s
-#   smart      ddtest picks the node count, by DURATION -> all nodes ~38s
-#   tia-smart  TIA prunes first, then duration split    -> all nodes ~16s
+#   naive   4 fixed nodes, split by file COUNT        -> slowest node ~69s
+#   smart   ddtest picks the node count, by DURATION  -> nodes finish together
+#
+# Parallelization ONLY. Test Impact Analysis has its own demo (DEMO.md B0);
+# mixing them here made the two ddtest legs indistinguishable and muddied what
+# the contrast was attributable to.
+#
+# REQUIRED: the demo branch must be in Datadog's TIA excluded-branches list.
+# Measured across five runs: on `preprod` (excluded) ddtest reports
+#   Backend durations used: 41 suites
+# while on a non-excluded branch it reports
+#   Backend durations used: 0 / Default durations used: 41
+# and falls back to file-size weights, which are uncorrelated with this
+# suite's sleeps. On a non-excluded branch TIA also skips 677 tests, so the
+# leg stops being a full-suite comparison against `naive`.
 #
 # The `paths` filter keeps this off the TIA demo's PR, which also targets
 # `preprod` but touches src/billing. For pull_request events GitHub evaluates
@@ -17,7 +29,8 @@ name: Parallel PR Demo
 # The push leg is the seeding run. `ddtest` splits on Datadog p50 timings and
 # falls back to file-size heuristics without them; our durations are artificial
 # sleeps uncorrelated with file size, so a cold service splits badly and the
-# `smart` leg looks no better than `naive`. Let a few preprod pushes land first.
+# `smart` leg looks no better than `naive`. Let a few preprod pushes land before
+# demoing, and check the plan summary says the chosen node count is > 1.
 
 on:
   pull_request:
@@ -112,10 +125,13 @@ jobs:
         env:
           DD_ENV: ci
           DD_SERVICE: demo-parallel-smart
-          # See the note on the run step below. On a PR, ITR off keeps the plan
-          # from pruning files so this leg stays a full-suite comparison
-          # against `naive`; on a push it is on so durations keep flowing.
-          DD_CIVISIBILITY_ITR_ENABLED: ${{ github.event_name == 'pull_request' && 'false' || 'true' }}
+          # ITR is deliberately left ON (no DD_CIVISIBILITY_ITR_ENABLED here).
+          # It is what makes the backend test-suite durations available, and
+          # setting it to "false" measurably produced
+          #   WARN "Test durations API returned no test suites"
+          # Skipping is prevented by the branch being TIA-excluded, not by this
+          # variable -- DD_CIVISIBILITY_ITR_ENABLED is a ddtrace setting and does
+          # not reach the ddtest planner, which fetches skippables itself.
       - name: Report chosen parallelism
         run: |
           count=$(cat .testoptimization/runner/parallel-runners.txt)
@@ -153,81 +169,4 @@ jobs:
         env:
           DD_ENV: ci
           DD_SERVICE: demo-parallel-smart
-          # ITR is ON for push (seeding) and OFF for pull_request (the demo).
-          #
-          # Measured: with DD_CIVISIBILITY_ITR_ENABLED=false the service reports
-          # no test suite durations at all, and `ddtest plan` logs
-          #   WARN "Test durations API returned no test suites" ... count=0
-          # falling back to file-size weights. Those are uncorrelated with our
-          # artificial sleeps, so the split came out WORSE than `naive`
-          # (131s slowest node vs naive's 97s). Duration-aware splitting needs
-          # the Test Optimization data that ITR collection produces.
-          #
-          # `preprod` is a TIA excluded branch, so leaving ITR on for the push
-          # leg seeds durations while skipping nothing. On the PR we turn it off
-          # so this leg runs the FULL suite and stays comparable to `naive` —
-          # by then the durations are already seeded.
-          DD_CIVISIBILITY_ITR_ENABLED: ${{ github.event_name == 'pull_request' && 'false' || 'true' }}
-
-  # ---------------------------------------------------------------- leg C
-  tia_smart_plan:
-    name: tia-smart (plan)
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.dd_plan.outputs.matrix }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: ./.github/actions/setup-demo
-        with:
-          install_ddtest: "true"
-        env:
-          DD_API_KEY: ${{ secrets.DD_API_KEY }}
-      - id: dd_plan
-        name: Plan split by duration, TIA enabled
-        # No DD_CIVISIBILITY_ITR_ENABLED here: TIA is on by default, so the plan
-        # only contains files with at least one non-skipped test.
-        run: |
-          bin/ddtest plan --tests-exclude-pattern 'tests/flaky/**'
-        env:
-          DD_ENV: ci
-          DD_SERVICE: demo-parallel-tia
-      - name: Report chosen parallelism
-        run: |
-          count=$(cat .testoptimization/runner/parallel-runners.txt)
-          files=$(wc -l < .testoptimization/runner/test-files.txt)
-          skipped=$(cat .testoptimization/runner/skippable-percentage.txt 2>/dev/null || echo "n/a")
-          echo "### tia-smart: ddtest chose **${count}** node(s) for ${files} files (TIA skippable: ${skipped})" \
-            >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dd-artifacts-parallel-tia
-          path: .testoptimization
-          include-hidden-files: true
-
-  tia_smart:
-    name: tia-smart (node ${{ matrix.ci_node_index }})
-    runs-on: ubuntu-latest
-    needs: [tia_smart_plan]
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.tia_smart_plan.outputs.matrix) }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: ./.github/actions/setup-demo
-        with:
-          install_ddtest: "true"
-        env:
-          DD_API_KEY: ${{ secrets.DD_API_KEY }}
-      - uses: actions/download-artifact@v4
-        with:
-          name: dd-artifacts-parallel-tia
-          path: .testoptimization
-      - name: Run TIA + duration-split node
-        run: bin/ddtest run --ci-node ${{ matrix.ci_node_index }}
-        env:
-          DD_ENV: ci
-          DD_SERVICE: demo-parallel-tia
+          # ITR left ON here too, for the same reason as the plan step.
