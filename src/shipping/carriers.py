@@ -1,7 +1,7 @@
 """Shipping carriers module — demo business logic."""
 
 
-def select_carrier(carriers: list):
+def select_carrier(carriers: list) -> str:
     return carriers[0] if carriers else "default"
 
 

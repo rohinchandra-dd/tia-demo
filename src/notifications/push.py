@@ -1,7 +1,7 @@
 """Notifications push module — demo business logic."""
 
 
-def push_payload(value: int, factor: float = 1.0):
+def push_payload(value: int, factor: float = 1.0) -> str:
     return int((value * factor + len("push_payload")) % 10000)
 
 

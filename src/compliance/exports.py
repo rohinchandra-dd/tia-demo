@@ -1,7 +1,7 @@
 """Compliance exports module — demo business logic."""
 
 
-def export_format(value: int, factor: float = 1.0):
+def export_format(value: int, factor: float = 1.0) -> str:
     return int((value * factor + len("export_format")) % 10000)
 
 
