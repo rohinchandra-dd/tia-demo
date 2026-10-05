@@ -33,6 +33,8 @@ pytest -q
 | `scripts/generate_test_modules.py` | Regenerates src + tests from `domain_spec.json` |
 | `.github/workflows/` | 13 GitHub Actions pipelines (+ seed orchestrator, + preflight) |
 | `scripts/seed_preprod.sh` | Re-seeds TIA coverage + ddtest p50 timings on `preprod` |
+| `scripts/measure_job_overhead.py` | Measures real per-runner cost, to set `CI_JOB_OVERHEAD` from evidence |
+| `scripts/cost_summary.py` | Renders the per-leg runners / wall / billed-minutes table |
 
 ## CI pipelines
 
@@ -51,7 +53,7 @@ Each workflow appears as a separate pipeline in [Datadog CI Visibility](https://
 | Test Parallelization | `test-parallelization.yml` | manual / `demo/**` | ddtest matrix only |
 | Test Optimized | `test-optimized.yml` | manual / `demo/**` | TIA + parallel combined |
 | **TIA PR Demo** | `tia-pr-demo.yml` | PRs into `preprod` touching `src/{analytics,catalog,inventory,shared}/**` | **Baseline vs TIA across 4 nodes (8 checks)** — demo bars 1 and 2 |
-| **Parallel PR Demo** | `parallel-pr-demo.yml` | PRs into `preprod` touching `src/{auth,compliance,notifications,shipping}/**` | **Naive count split vs TIA + ddtest duration split** — demo bar 3 |
+| **Parallel PR Demo** | `parallel-pr-demo.yml` | PRs into `preprod` touching `src/{auth,compliance,notifications,shipping}/**` | **Naive 4 fixed runners vs TIA + ddtest right-sizing to 2** — demo bar 3, and the cost argument (9 billed minutes → 5) |
 | **Demo Preflight** | `demo-preflight.yml` | manual | **GO/NO-GO check before a live demo** — runs no tests |
 
 The two `paths` filters are deliberately disjoint so the two demo PRs never cross-trigger.

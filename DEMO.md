@@ -131,23 +131,58 @@ suite, same 4-node naive split on the `naive` leg. The `tia-parallel` leg runs t
 of TIA-selected set** (132s of work, mirrored against B0's) but lets `ddtest` decide which files
 go on which node, by measured duration instead of by count.
 
-| Leg | Split by | Nodes | Node **job** times | Slowest | Plan overhead |
+| Leg | Split by | Runners | Node **job** times | Wall | Billed minutes |
 | --- | --- | --- | --- | --- | --- |
-| `naive` | file **count**, all 965 tests | 4 (fixed) | 226 / 152 / 39 / 39 | **226s** | — |
-| `tia-parallel` | TIA-selected set, 17 of 41 files | 4 (ddtest chose) | 61 / 62 / 61 / 64 | **64s** | 25s sequential `plan` job |
+| `naive` | file **count**, all 965 tests | 4 (fixed) | 230 / 153 / 31 / 30 | **230s** | **9** |
+| `tia-parallel` | TIA-selected set, 17 of 41 files | **2** (ddtest chose) | 100 / 101 | **133s** | **5** |
 
-> Measured on PR #7, run 37250040102 (2026-10-05). End to end the leg is 25s + 64s = **89s**
-> against `naive`'s 226s, and the four nodes land within **3 seconds** of each other — which
-> is the whole claim.
+> Measured on PR #7, run 37329187588 (2026-10-05). The `tia-parallel` wall and bill include
+> its 29s sequential `plan` job. The planner was allowed 4 runners and **chose 2**, and the
+> two nodes land within **1 second** of each other.
 
-**The story**: *"Same PR, same selected tests. The only thing that changed is which node each
-file landed on — and now all four finish within three seconds of each other instead of one
-carrying everything. We pay 25 seconds up front for the planning job, and still come in at 89
-seconds against the naive split's 226."*
+This is the bar that carries the **cost** argument, so lead with the last column.
 
-**"Why not just add more nodes?"** `MAX_PARALLELISM` is capped at 4 on purpose. Splitting is per
-*file*, and one compliance file is 30s — that is the floor. Left at 8, ddtest picks 6 and two
-nodes finish in ~4s, which costs compute and undercuts the point. Good question to invite.
+**The story**: *"The planner was allowed four runners and decided it only needed two. Same
+selected tests, both nodes finish within a second of each other, and we come in at 133 seconds
+against the naive split's 230 — on half the machines. The bill goes from nine minutes to
+five."*
+
+**Do not skip the cost line — it is the one an exec remembers.** The `cost summary` job at the
+bottom of every run prints it automatically:
+
+| leg | runners | wall clock | runner-seconds | billed minutes |
+| --- | --- | --- | --- | --- |
+| `naive` | 4 | 230s | 444s | **9** |
+| `tia-parallel` | **2** | 133s | 230s | **5** |
+
+#### Why it chose 2, and why that is the cost story
+
+`ddtest` scores every candidate as `wall + runners x CI_JOB_OVERHEAD` and takes the minimum,
+so `CI_JOB_OVERHEAD` is where you tell it what a runner costs you. From this run's plan log:
+
+```
+  2 runners: wall 1m48s, overhead 2m0s, score 3m48s, selected
+  3 runners: wall 1m12s, overhead 3m0s, score 4m12s
+```
+
+We set it to **60s**, and that number is derived, not chosen to look good:
+
+- `scripts/measure_job_overhead.py` measures real per-runner waste as
+  `queue + job wall - pytest time`. Pooled over 13 runner jobs across 4 runs: **p50 30s**.
+- But raw seconds are not the bill. **GitHub bills each job separately and rounds every one up
+  to a whole minute**, so a runner's marginal cost never falls below 60s however briefly it
+  runs.
+
+That rounding is the whole point. Before this change, at 4 runners, `tia-parallel` billed
+**9 minutes — exactly what `naive` billed** — while running a fifth of the tests. Every second
+saved was handed straight back as per-job rounding. Two runners cuts it to 5.
+
+If someone asks whether 60s is a fudge: the honest stopwatch number, 30s, selects **3**
+runners, by only 6s over 2 — inside the noise of the measurement. Say so. It is the billing
+model, not the stopwatch, that makes the decision stable.
+
+`MAX_PARALLELISM` stays at 4 so this is like-for-like with the `naive` leg beside it. The cap
+is not what reduced the runner count.
 
 **Re-run the demo (PR #7 already exists — this is the normal path):**
 ```bash
