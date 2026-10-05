@@ -1,7 +1,4 @@
-"""New unstable test for Early Flake Detection demo branch (demo/introduce-flaky-test).
-
-Add this file on the demo branch to trigger EFD. It alternates pass/fail across attempts.
-"""
+"""Timing checks for the checkout flow."""
 
 from __future__ import annotations
 

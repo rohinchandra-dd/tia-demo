@@ -308,7 +308,10 @@ entirely.
 The PR adds exactly one file, `tests/flaky/test_new_flaky_efd.py`, and nothing else. It reads like
 an ordinary feature PR; nobody labelled the test as risky.
 
-1. Show the diff — one new test, `test_new_checkout_flow_timing`.
+1. Show the diff — one new test, `test_new_checkout_flow_timing`. It is deliberately written
+   the way a real test would be: the alternating module-level counter is the only thing odd
+   about it, and nobody reviewing the PR flagged it. (The template it was copied from is
+   `tests/flaky/_template_test_new_flaky_efd.py`, underscore-prefixed so pytest skips it.)
 2. Test Runs → `@test.is_new:true` on this commit. Datadog has never seen this test, because it is
    absent from the known-tests baseline it keeps for `demo-flake-prevention`.
 3. `@test.retry_reason:early_flake_detection` → **ten** attempts on that one test, where the
