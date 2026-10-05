@@ -154,8 +154,12 @@ jobs:
           files=$(wc -l < .testoptimization/runner/test-files.txt | tr -d ' ')
           # "Backend durations used: N suites" -- matched loosely so a change in
           # ddtest's wording degrades to "unknown" rather than a false failure.
-          suites=$(grep -i duration ddtest-plan.log \
-            | grep -oiE '[0-9]+ suites?' | grep -oE '[0-9]+' | tail -1 || true)
+          # Anchored on "Backend durations used: N suites". Do NOT loosen this:
+          # the very next line is "Default durations used: 0 suites", so a
+          # pattern that merely looks for "<N> suites" near the word "duration"
+          # picks up the 0 and reports a healthy plan as a broken one.
+          suites=$(grep -oiE 'Backend durations used:[[:space:]]*[0-9,]+' \
+            ddtest-plan.log | grep -oE '[0-9,]+$' | tr -d ',' | tail -1 || true)
           {
             echo "### tia-parallel plan"
             echo ""
