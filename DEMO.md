@@ -63,20 +63,19 @@ Step-by-step scenarios for demonstrating Datadog CI/CD Optimization and Test Opt
 One PR (#6), 8 checks. Both legs run the identical 965-test suite, split across the same 4
 nodes by the same naive file-count shard. The only difference is `DD_CIVISIBILITY_ITR_ENABLED`.
 
-| Leg | node 0 | node 1 | node 2 | node 3 | Slowest | Total compute |
-| --- | --- | --- | --- | --- | --- | --- |
-| `baseline` | 240 passed **204s** | 240 passed 124s | 173 passed 8s | 312 passed 8s | **204s** | 344s |
-| `tia` | 48 passed, 192 skipped **120s** | 48 passed, 192 skipped **4s** | 53 passed, 120 skipped **4s** | 48 passed, 264 skipped **4s** | **120s** | 132s |
+| Leg | node 0 | node 1 | node 2 | node 3 | Slowest job |
+| --- | --- | --- | --- | --- | --- |
+| `baseline` | 240 passed **204s** | 240 passed 131s | 173 passed 7s | 312 passed 10s | **232s** |
+| `tia` | 48 passed, 192 skipped **120.9s** | 48 passed, 192 skipped **5.3s** | 53 passed, 120 skipped **5.0s** | 48 passed, 264 skipped **4.8s** | **146s** |
 
-> These are **modelled** from `scripts/domain_spec.json`, not measured — the budgets were
-> retuned and the suite has not been re-run since. Replace this table with real numbers from
-> the first green run, and quote **test time**, not job time: both legs pay ~25s of fixed
-> setup (checkout, pip, Datadog agent).
+> Measured on PR #6, run 37250036732 (2026-10-05). Test times in the cells, slowest **job**
+> time in the last column — both legs pay ~25s of fixed setup (checkout, pip, Datadog agent).
+> Quote whichever you use consistently; the job times are what the Actions UI shows.
 
 **The two things to say:**
 
-1. *"TIA skipped 768 of 965 tests. The slowest node went from 204 seconds to 120, and total
-   compute from 344 to 132 — we are paying for a third of the machine time."*
+1. *"TIA skipped 768 of 965 tests. The slowest node went from 204 seconds to 121, and total
+   compute from 344 to 136 — we are paying for a third of the machine time."*
 2. *"But look at the distribution. Every node is running the same **number** of tests — 48 —
    and node 0 takes two minutes while the other three take four seconds. TIA removed the work;
    it did nothing about how the remainder is spread."*
@@ -132,17 +131,19 @@ suite, same 4-node naive split on the `naive` leg. The `tia-parallel` leg runs t
 of TIA-selected set** (132s of work, mirrored against B0's) but lets `ddtest` decide which files
 go on which node, by measured duration instead of by count.
 
-| Leg | Split by | Nodes | Node test times | Slowest | Plan overhead |
+| Leg | Split by | Nodes | Node **job** times | Slowest | Plan overhead |
 | --- | --- | --- | --- | --- | --- |
-| `naive` | file **count**, all 965 tests | 4 (fixed) | 204 / 124 / 8 / 8 | **204s** | — |
-| `tia-parallel` | **duration**, TIA-selected set | 4 (ddtest chose) | ~33 / 33 / 33 / 33 | **~33s** | ~40s sequential `plan` job |
+| `naive` | file **count**, all 965 tests | 4 (fixed) | 226 / 152 / 39 / 39 | **226s** | — |
+| `tia-parallel` | TIA-selected set, 17 of 41 files | 4 (ddtest chose) | 61 / 62 / 61 / 64 | **64s** | 25s sequential `plan` job |
 
-> Also modelled. 132s of selected work over 4 nodes, floor set by the largest single selected
-> file (one `compliance` module at 30s), so ~33s per node is the honest optimum.
+> Measured on PR #7, run 37250040102 (2026-10-05). End to end the leg is 25s + 64s = **89s**
+> against `naive`'s 226s, and the four nodes land within **3 seconds** of each other — which
+> is the whole claim.
 
 **The story**: *"Same PR, same selected tests. The only thing that changed is which node each
-file landed on — and now all four finish together instead of one carrying everything. We pay
-about 40 seconds up front for the planning job, and still come out well ahead."*
+file landed on — and now all four finish within three seconds of each other instead of one
+carrying everything. We pay 25 seconds up front for the planning job, and still come in at 89
+seconds against the naive split's 226."*
 
 **"Why not just add more nodes?"** `MAX_PARALLELISM` is capped at 4 on purpose. Splitting is per
 *file*, and one compliance file is 30s — that is the floor. Left at 8, ddtest picks 6 and two
@@ -163,32 +164,29 @@ from B0's four. `compliance` is the load-bearing one (30s per file). Edit elsewh
 node time. Worth saying out loud: planning costs roughly that much regardless of suite size —
 a third of this toy suite, noise on a 40-minute one.
 
-#### ⚠️ Known issue: `Backend durations used: 0 suites`
+#### Resolved: why the plan reports `Backend durations used: 0 suites`
 
-`ddtest` splits on Datadog p50 timings and falls back to **file-size** weights without them.
-File size is uncorrelated with this suite's artificial sleeps, so the fallback produces a split
-no better than naive — measured on run 37066726705 as 29/27/141/141s — and it still reports as a
-**green, successful run**. Nothing about the Actions UI tells you it happened.
+**TIA skipping suppresses the duration lookup.** Measured on the same commit, 2026-10-05:
 
-There are two candidate causes and they have **different fixes**:
+| Run | Test skipping | TIA skippables returned | Backend durations |
+| --- | --- | --- | --- |
+| preprod push (37249726282) | disabled (excluded branch) | — | **41 suites** |
+| PR #7 (37250040102) | enabled | 764 tests | **0 suites** / Default: 41 |
 
-1. **Cold or stale timings.** Regenerating test files invalidates p50s for
-   `demo-parallel-smart`. Fix: `scripts/seed_preprod.sh 3`.
-2. **TIA skipping suppresses the durations lookup.** Measured earlier in this repo's history:
+So on a demo PR this is **expected and permanent** — re-seeding cannot change it, and the
+`plan` job says so rather than sending you to `seed_preprod.sh`. It is only a real problem when
+skipping is *off* and durations are still 0, which means the service is genuinely cold.
 
-   ```
-   without ITR:NoSkip   tiaSkippableTestsCount=677  ->  Backend durations used: 0  / Default: 41
-   with ITR:NoSkip      tiaSkippableTestsCount=0    ->  Backend durations used: 41 / Default: 0
-   ```
+**It does not hurt this demo.** With 24 of 41 files fully skipped, the selected set is 4 heavy
+`compliance` files and 13 light ones, so any sane 4-way split lands one heavy file per node —
+measured 61/62/61/64s. The balance is structural, not luck. It would stop holding if the
+selected set ever had fewer heavy files than nodes.
 
-   If this is the real cause, no amount of seeding fixes it, and the choice is between a
-   *duration-balanced* bar 3 (add `ITR:NoSkip`, full suite, parallelization only) and a
-   *TIA-selected* bar 3 (leave it, accept a worse split). The current workflow leaves TIA on.
-
-**Settle it before the webinar:** Actions → **Demo Preflight** → Run workflow. It runs the same
-`ddtest plan` the demo will run and answers GO / NO-GO on exactly this, without running a single
-test. The `tia-parallel (plan)` job in the demo itself only *warns* about this — deliberately,
-since a red X mid-webinar is worse than a degraded bar.
+**Seeding still matters, for the `naive` bar and for Datadog's p50s.** Those lag several runs
+behind: immediately after the retune the planner still quoted `test_cohorts.py` at 24.227s and
+`test_calculator.py` at 27.868s — values from *two* retunes earlier. Three seeding rounds moved
+`test_calculator` to 36.874s and the planner's imbalance estimate from 14.8s to 5.0s. Run
+`scripts/seed_preprod.sh 3` after any `domain_spec.json` change, then **Demo Preflight**.
 
 **Why `DD_CIVISIBILITY_ITR_ENABLED` is not used here.** It is a `ddtrace` setting and has no
 effect once `ddtest` drives the run — `ddtest` queries Datadog for skippable tests and deselects

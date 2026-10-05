@@ -170,10 +170,28 @@ jobs:
             echo "| backend duration suites | ${suites:-unknown} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
+          # Measured 2026-10-05, same commit, two runs: a preprod push with
+          # "Test skipping: disabled" got "Backend durations used: 41 suites",
+          # and the PR run with skipping enabled and 764 skippables returned got
+          # "0 suites / Default: 41". TIA skipping suppresses the durations
+          # lookup. On a demo PR that is EXPECTED, not a seeding gap, and no
+          # amount of re-seeding changes it -- so do not send people to
+          # seed_preprod.sh for it. The split is still fine here because the
+          # selected set is 4 heavy files and 13 light ones, so any sane 4-way
+          # split lands one heavy per node (measured 61/62/61/64s).
+          skipping_on=no
+          grep -qiE 'Test skipping:[[:space:]]*enabled' ddtest-plan.log \
+            && skipping_on=yes
+
           reason=""
+          note=""
           if [ "${suites:-}" = "0" ] \
             || grep -qi 'durations API returned no test suites' ddtest-plan.log; then
-            reason="ddtest got NO backend durations and fell back to file-size weights."
+            if [ "$skipping_on" = yes ]; then
+              note="Backend durations are suppressed while TIA skipping is active (expected; see DEMO.md B1). The split used default weights -- confirm the node times below are within a few seconds of each other."
+            else
+              reason="ddtest got NO backend durations and TIA skipping is off, so timings for this service are genuinely cold."
+            fi
           elif [ "$nodes" -lt 2 ]; then
             reason="ddtest chose ${nodes} node(s); the demo needs a real split."
           fi
@@ -189,6 +207,9 @@ jobs:
               echo "> workflow, before relying on this bar. See DEMO.md B1."
             } >> "$GITHUB_STEP_SUMMARY"
             echo "::warning::${reason} See DEMO.md B1; run scripts/seed_preprod.sh 3."
+          elif [ -n "$note" ]; then
+            echo "> [!NOTE]" >> "$GITHUB_STEP_SUMMARY"
+            echo "> ${note}" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "> [!NOTE]" >> "$GITHUB_STEP_SUMMARY"
             echo "> Duration-based split confirmed against ${suites} backend suite(s)." \
