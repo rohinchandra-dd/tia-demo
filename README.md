@@ -103,7 +103,7 @@ gh workflow run demo-preflight.yml --ref preprod
 
 Regenerating test files invalidates their per-test coverage and p50 timings, and both demos
 **fail softly** when that data is cold — the TIA bar comes out level with the baseline bar and
-`ddtest` falls back to splitting by file size. Neither shows up as a failed run, so always
+`ddtest` falls back to weighting every suite at one second per test. Neither shows up as a failed run, so always
 confirm **Demo Preflight** reports GO.
 
 **Everything else — automated:** Actions → **CI - Seed Datadog Data** → Run workflow

@@ -177,10 +177,25 @@ So on a demo PR this is **expected and permanent** — re-seeding cannot change 
 `plan` job says so rather than sending you to `seed_preprod.sh`. It is only a real problem when
 skipping is *off* and durations are still 0, which means the service is genuinely cold.
 
-**It does not hurt this demo.** With 24 of 41 files fully skipped, the selected set is 4 heavy
-`compliance` files and 13 light ones, so any sane 4-way split lands one heavy file per node —
-measured 61/62/61/64s. The balance is structural, not luck. It would stop holding if the
-selected set ever had fewer heavy files than nodes.
+**What it falls back to is one second per test** — not file size, which earlier versions of
+these docs claimed. From the same plan log:
+
+```
+test_calculator.py  (72 tests, heavy)  ->  historical duration 1m12s = 72s
+tests/auth/test_mfa.py  (12 tests)     ->  historical duration   12s = 12s
+```
+
+So on a demo PR the planner sees the selected set as **17 identical 12s suites**, and its
+candidate walls are exactly `ceil(17/n) x 12` = 204 / 108 / 72 / 60. Two things follow, and
+both matter:
+
+- **Our `sleep_seconds` budgets are invisible to the planner.** Retuning durations cannot
+  change how many runners it picks, or how it distributes files. Only `CI_JOB_OVERHEAD` and
+  the number of selected files can.
+- **The node balance is not guaranteed.** The 4-node run came out at 61/62/61/64s because the
+  four 30s `compliance` files landed on separate nodes — an artifact of the planner's
+  distribution order over equal-weight files, not something it reasoned about. Re-check the
+  node times whenever the runner count or the selected set changes.
 
 **Seeding still matters, for the `naive` bar and for Datadog's p50s.** Those lag several runs
 behind: immediately after the retune the planner still quoted `test_cohorts.py` at 24.227s and

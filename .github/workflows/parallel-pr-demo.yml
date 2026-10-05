@@ -28,12 +28,17 @@ name: Parallel PR Demo
 # Do NOT add `paths` to the push trigger: that uses a two-dot diff, where an
 # empty commit changes nothing and the seeding run would silently not fire.
 #
-# The push leg is the seeding run. `ddtest` splits on Datadog p50 timings and
-# falls back to file-size heuristics without them; our durations are artificial
-# sleeps uncorrelated with file size, so a cold service splits badly and the
-# `smart` leg looks no better than `naive`. Run `scripts/seed_preprod.sh` after
-# any change to scripts/domain_spec.json, and before demoing run the
-# `Demo Preflight` workflow -- the plan job's guard enforces this either way.
+# The push leg is the seeding run. `ddtest` splits on Datadog p50 timings, and
+# without them it falls back to ONE SECOND PER TEST -- measured on the plan of
+# run 37250040102, where a 72-test heavy suite was weighted at 1m12s and a
+# 12-test light one at 12s. Not file size. That distinction matters: on a demo
+# PR, TIA skipping suppresses the duration lookup, so the planner sizes the
+# selected set as 17 identical 12s suites and OUR sleep_seconds budgets are
+# invisible to it. Retuning durations cannot move the runner count; only
+# CI_JOB_OVERHEAD and the selected file count can.
+#
+# Run `scripts/seed_preprod.sh` after any change to scripts/domain_spec.json,
+# and before demoing run the `Demo Preflight` workflow.
 
 on:
   pull_request:
@@ -61,17 +66,36 @@ env:
   DD_TEST_OPTIMIZATION_RUNNER_PLATFORM: python
   DD_TEST_OPTIMIZATION_RUNNER_FRAMEWORK: pytest
   DD_TEST_OPTIMIZATION_RUNNER_MIN_PARALLELISM: 1
-  # Capped at 4 deliberately. The selected set is 132s whose largest file is 30s
-  # (one compliance module), so 4 nodes is the honest optimum (~33s each). Left
-  # at 8, ddtest picks 6 and the extra nodes finish in ~4s -- measured
-  # 27/27/3.9/3.9/26/26.7 -- which costs compute and undercuts the claim that
-  # every node finishes together.
+  # Capped at 4 to stay like-for-like with the `naive` leg's 4 fixed nodes, so
+  # "allowed 4, chose fewer" reads cleanly next to it. The cap is NOT what
+  # reduces the runner count -- CI_JOB_OVERHEAD below is. On an earlier config
+  # with the cap at 8, ddtest picked 6 and two nodes finished in ~4s.
   DD_TEST_OPTIMIZATION_RUNNER_MAX_PARALLELISM: 4
-  # Load-bearing. ddtest scores each candidate as
-  # (slowest-worker time + nodes x overhead) and prefers fewer nodes on ties.
-  # Against 132s of work the 25s default scores 2 nodes best and lands at ~66s,
-  # barely beating the naive split. At 5s, 4 nodes wins and lands at ~33s.
-  DD_TEST_OPTIMIZATION_RUNNER_CI_JOB_OVERHEAD: 5s
+  # Load-bearing, and the whole point of the cost demo. ddtest scores each
+  # candidate as (slowest-worker time + runners x overhead) and takes the
+  # minimum, so this is where you tell it what a runner costs you.
+  #
+  # `scripts/measure_job_overhead.py` measures it. Pooled over 13 runner jobs
+  # across 4 runs: queue 2s + setup ~28s = p50 **30s** of pure waste per
+  # runner. But raw seconds are not the bill. GitHub invoices each job
+  # separately and rounds every one UP to a whole minute, so the marginal cost
+  # of adding a runner is never below 60s however briefly it runs:
+  #
+  #   run 37250040102, 135s of selected test time, +1 min for the plan job
+  #     1 runner   job 165s  ->  4 billed min
+  #     2 runners  job  98s  ->  5 billed min
+  #     3 runners  job  75s  ->  7 billed min
+  #     4 runners  job  64s  ->  9 billed min   <- what 5s bought us
+  #   the naive leg, running 5x more test work, also bills 9 min.
+  #
+  # At 4 runners this leg cost exactly as much as `naive` despite running a
+  # fifth of the tests -- every second saved was handed back as rounding. 60s
+  # is that rounding expressed in the planner's own units, and at 60s it
+  # selects 2 runners (score 228s, vs 252s for 3 and 264s for 1).
+  #
+  # The measured-but-unrounded 30s would select 3, by only 6s over 2 -- inside
+  # the noise of the measurement. Re-run the script if the suite shape changes.
+  DD_TEST_OPTIMIZATION_RUNNER_CI_JOB_OVERHEAD: 60s
 
 jobs:
   # ---------------------------------------------------------------- leg A
@@ -135,12 +159,12 @@ jobs:
           # suppresses the durations entirely:
           #   WARN "Test durations API returned no test suites"
       - name: Report plan quality
-        # ddtest falls back to FILE SIZE weights when it gets no p50 durations
-        # from the backend. Our durations are artificial sleeps uncorrelated
-        # with file size, so that fallback silently produces a split no better
-        # than `naive` -- measured at 29/27/141/141s off "Backend durations
-        # used: 0 suites". It still reports as a green, successful run, which
-        # makes it the worst possible thing to discover live.
+        # Without backend p50s, ddtest weights every suite at ONE SECOND PER
+        # TEST -- uncorrelated with our artificial sleeps -- so the fallback
+        # can silently produce a split no better than `naive`, measured once at
+        # 29/27/141/141s off "Backend durations used: 0 suites". It still
+        # reports as a green, successful run, which makes it the worst possible
+        # thing to discover live.
         #
         # This step only REPORTS, deliberately. It does not fail the job,
         # because a red X mid-webinar is worse than a degraded bar, and because
@@ -190,7 +214,7 @@ jobs:
             if [ "$skipping_on" = yes ]; then
               note="Backend durations are suppressed while TIA skipping is active (expected; see DEMO.md B1). The split used default weights -- confirm the node times below are within a few seconds of each other."
             else
-              reason="ddtest got NO backend durations and TIA skipping is off, so timings for this service are genuinely cold."
+              reason="ddtest got NO backend durations and TIA skipping is off, so p50 timings for this service are genuinely cold."
             fi
           elif [ "$nodes" -lt 2 ]; then
             reason="ddtest chose ${nodes} node(s); the demo needs a real split."
@@ -252,3 +276,29 @@ jobs:
           DD_ENV: ci
           DD_SERVICE: demo-parallel-smart
           # ITR left ON here too, for the same reason as the plan step.
+
+
+  # ---------------------------------------------------------------- summary
+  cost_summary:
+    name: cost summary
+    runs-on: ubuntu-latest
+    needs: [naive, tia_parallel_plan, tia_parallel]
+    # always(): the comparison is most worth reading when a leg went sideways.
+    if: always()
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare runners, wall clock and billed minutes
+        # Rendering lives in scripts/cost_summary.py so it can be tested
+        # locally against a past run, rather than only in anger during a demo.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SLUG: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${SLUG}/actions/runs/${RUN_ID}/jobs" --paginate \
+            --jq '.jobs[] | {name, started_at, completed_at}' \
+            | python3 scripts/cost_summary.py >> "$GITHUB_STEP_SUMMARY"

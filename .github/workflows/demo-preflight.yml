@@ -6,8 +6,9 @@ name: Demo Preflight
 #
 # Both demo bars depend on data Datadog can only learn by watching the suite
 # run on `preprod`, and both FAIL SOFTLY when that data is cold -- the TIA bar
-# comes out level with the naive bar, and ddtest falls back to splitting by
-# file size. Neither shows up as a red X. This workflow turns both into one
+# comes out level with the naive bar, and ddtest falls back to weighting every
+# suite at one second per test. Neither shows up as a red X. This turns both
+# into one
 # explicit answer before anyone is watching.
 #
 # Remediation is always `scripts/seed_preprod.sh 3`, never a code change.
@@ -56,7 +57,7 @@ jobs:
           problems=()
           if [ "${suites:-}" = "0" ] \
             || grep -qi 'durations API returned no test suites' ddtest-plan.log; then
-            problems+=("No backend p50 durations -- ddtest would split by file size, so bar 3 would be no faster than bar 1.")
+            problems+=("No backend p50 durations -- ddtest would weight every suite at 1s per test, so bar 3 may be no faster than bar 1.")
           fi
           if [ "${nodes:-0}" -lt 4 ]; then
             problems+=("ddtest chose ${nodes:-?} node(s), expected 4 -- bar 3 will not show every node finishing together.")
