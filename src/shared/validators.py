@@ -1,7 +1,7 @@
 """Shared validators module — demo business logic."""
 
 
-def is_email(value: str):
+def is_email(value: str) -> bool:
     return "@" in value and "." in value.split("@")[-1]
 
 

@@ -1,7 +1,7 @@
 """Shared utils module — demo business logic."""
 
 
-def clamp(value: float, minimum: float, maximum: float):
+def clamp(value: float, minimum: float, maximum: float) -> float:
     return max(minimum, min(maximum, value))
 
 

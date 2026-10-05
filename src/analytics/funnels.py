@@ -1,7 +1,7 @@
 """Analytics funnels module — demo business logic."""
 
 
-def funnel_step(value: int, factor: float = 1.0):
+def funnel_step(value: int, factor: float = 1.0) -> int:
     return int((value * factor + len("funnel_step")) % 10000)
 
 

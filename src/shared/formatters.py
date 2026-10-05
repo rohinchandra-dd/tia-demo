@@ -1,7 +1,7 @@
 """Shared formatters module — demo business logic."""
 
 
-def format_currency(amount: float):
+def format_currency(amount: float) -> str:
     return f"${amount:.2f}"
 
 

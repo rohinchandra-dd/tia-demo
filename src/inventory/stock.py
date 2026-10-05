@@ -1,7 +1,7 @@
 """Inventory stock module — demo business logic."""
 
 
-def check_stock(available: int, requested: int):
+def check_stock(available: int, requested: int) -> bool:
     return available >= requested
 
 

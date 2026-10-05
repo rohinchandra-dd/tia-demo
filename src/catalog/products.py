@@ -1,7 +1,7 @@
 """Catalog products module — demo business logic."""
 
 
-def product_sku(value: int, factor: float = 1.0):
+def product_sku(value: int, factor: float = 1.0) -> int:
     return int((value * factor + len("product_sku")) % 10000)
 
 

@@ -1,7 +1,7 @@
 """Catalog categories module — demo business logic."""
 
 
-def category_path(value: int, factor: float = 1.0):
+def category_path(value: int, factor: float = 1.0) -> int:
     return int((value * factor + len("category_path")) % 10000)
 
 
