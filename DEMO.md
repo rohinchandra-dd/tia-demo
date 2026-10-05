@@ -324,6 +324,19 @@ kept **per test service**. `demo-flake-prevention` is a new service, so the Flak
 workflow must run on `preprod` (its push leg) *before* EFD is switched on — otherwise all seven
 pre-existing flaky tests are new too and the demo loses its point.
 
+> [!IMPORTANT]
+> **Pick a test name Datadog has not seen, every time you rebuild this demo.** The baseline is
+> keyed on the test's name, and it records a test the first time it *runs* — whether or not EFD
+> was enabled at the time. So a dry run on the branch before switching EFD on silently burns the
+> name: the next run retries it under Auto Test Retries (3 attempts, `retry_reason:auto_test_retry`)
+> instead of EFD (10 attempts, `retry_reason:early_flake_detection`), and the gate never fires.
+>
+> Check before pushing — if this returns anything, choose another name:
+> ```
+> @test.service:demo-flake-prevention @test.name:<your_test_name>
+> ```
+> Names already burned on this service: `test_new_checkout_flow_timing`.
+
 ### C5 — The New Flaky Test PR Gate
 
 1. Back to the PR's checks: **`flaky-suite` is green, the Datadog New Flaky Test check is red.**
@@ -369,9 +382,12 @@ git push -u origin demo/tia-billing-fix
 # EFD / PR Gate demo — copy template to create a genuinely new test.
 # Base on preprod: the `tests/flaky/**` path filter on flake-prevention-pr-demo.yml
 # makes `flaky-suite` the only check, and no other demo PR is disturbed.
+# RENAME THE TEST FUNCTION to something this service has never run (see C4) --
+# a name already in the known-tests baseline is not new, and EFD will skip it.
 git checkout -b demo/introduce-flaky-test origin/preprod
-cp tests/flaky/_template_test_new_flaky_efd.py tests/flaky/test_new_flaky_efd.py
-git add tests/flaky/test_new_flaky_efd.py
+cp tests/flaky/_template_test_new_flaky_efd.py tests/flaky/test_checkout_timing.py
+$EDITOR tests/flaky/test_checkout_timing.py   # rename test_checkout_flow_timing_RENAME_ME
+git add tests/flaky/test_checkout_timing.py
 git commit -m "feat: add checkout flow test"
 git push -u origin demo/introduce-flaky-test
 gh pr create --base preprod --title "feat: add checkout flow timing test"
