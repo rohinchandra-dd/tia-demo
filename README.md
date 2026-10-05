@@ -54,9 +54,12 @@ Each workflow appears as a separate pipeline in [Datadog CI Visibility](https://
 | Test Optimized | `test-optimized.yml` | manual / `demo/**` | TIA + parallel combined |
 | **TIA PR Demo** | `tia-pr-demo.yml` | PRs into `preprod` touching `src/{analytics,catalog,inventory,shared}/**` | **Baseline vs TIA across 4 nodes (8 checks)** — demo bars 1 and 2 |
 | **Parallel PR Demo** | `parallel-pr-demo.yml` | PRs into `preprod` touching `src/{auth,compliance,notifications,shipping}/**` | **Naive 4 fixed runners vs TIA + ddtest right-sizing to 2** — demo bar 3, and the cost argument (9 billed minutes → 5) |
+| **Flake Prevention PR Demo** | `flake-prevention-pr-demo.yml` | PRs into `preprod` touching `tests/flaky/**` | **Auto Test Retries, Early Flake Detection, and the New Flaky Test PR Gate** — the only workflow that runs `tests/flaky/` on a PR |
 | **Demo Preflight** | `demo-preflight.yml` | manual | **GO/NO-GO check before a live demo** — runs no tests |
 
-The two `paths` filters are deliberately disjoint so the two demo PRs never cross-trigger.
+The three `paths` filters are deliberately disjoint so the demo PRs never cross-trigger:
+TIA takes `src/{analytics,catalog,inventory,shared}`, Parallel takes
+`src/{auth,compliance,notifications,shipping}`, and Flake Prevention takes `tests/flaky`.
 Because GitHub evaluates `paths` on a pull request against the three-dot diff, an **empty
 commit** on either branch re-fires the whole demo — that is the live trigger.
 
@@ -67,6 +70,7 @@ Each pipeline reports to a distinct test service for clean Datadog filtering:
 - `demo-quick-smoke`, `demo-pr-validation`, `demo-main-build`, `demo-nightly`, `demo-hotfix`
 - `demo-baseline`, `demo-tia`, `demo-parallel`, `demo-optimized`
 - `demo-parallel-naive`, `demo-parallel-smart` (Parallel PR Demo legs)
+- `demo-flake-prevention` (Flake Prevention PR Demo)
 
 ## Datadog setup
 
@@ -91,8 +95,10 @@ In [CI/CD Optimization → Settings → Repositories](https://app.datadoghq.com/
 | --- | --- |
 | Test Impact Analysis | Enabled; exclude `main` **and `preprod`** (see DEMO.md B0) |
 | Tracked files | `requirements.txt`, `pyproject.toml`, `scripts/generate_test_modules.py` — a PR touching any of these forces a full run |
-| Auto Test Retries | Enabled for `demo-main-build`, `demo-pr-validation` |
-| Early Flake Detection | Enabled for `demo-pr-validation` |
+| Auto Test Retries | Enabled for `demo-main-build`, `demo-flake-prevention` (under **Prevention**) |
+| Early Flake Detection | Enabled for `demo-flake-prevention` (under **Prevention**) — turn on only **after** the Flake Prevention workflow has run on `preprod` at least once, or every test in `tests/flaky/` looks new |
+| PR Comments | Enabled (under **General**) — this is how retries surface on the PR itself. Repo- or org-level only; it cannot be overridden per test service |
+| New Flaky Test PR Gate | A rule at [PR Gates → Create Rule](https://app.datadoghq.com/ci/pr-gates/rule/create?dataSource=test_optimization), scoped to this repository, with the Early Flake Detection option ticked |
 
 ### 4. Seeding before a live demo
 
@@ -123,7 +129,9 @@ See [DEMO.md](DEMO.md) for step-by-step demo scripts.
 - **TIA mapping**: `tests/billing/test_calculator.py` ↔ `src/billing/calculator.py`
 - **Slow tests**: `@pytest.mark.slow` on 8 heavy modules; per-file budgets set by `sleep_seconds` in `domain_spec.json` (344s total, deterministic) — 30s on each `analytics` and `compliance` file, 40s on `billing.calculator` and `billing.discounts`, 1s on the 24 light modules. Duration is independent of test count: `heavy` controls how many tests a module emits, `sleep_seconds` how long they take
 - **Unskippable**: `tests/integration/test_data_driven.py` reads `fixtures/`
-- **Flaky demos**: `tests/flaky/` — retry-recoverable, intermittent, and EFD scenarios
+- **Flaky demos**: `tests/flaky/` — retry-recoverable (fails its first attempt every run, so it is
+  deterministically red without Auto Test Retries), intermittent (35% random), and the EFD template.
+  Every workflow except **Flake Prevention PR Demo** and **CI - Main Build** excludes the directory
 
 ## Key constraints
 

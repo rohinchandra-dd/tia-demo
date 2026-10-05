@@ -1,0 +1,102 @@
+name: Flake Prevention PR Demo
+
+# The prevention half of the Test Optimization story: Auto Test Retries absorb
+# a known flake in-process, Early Flake Detection retries a test Datadog has
+# never seen, and the New Flaky Test PR Gate blocks the PR that introduced it.
+#
+# Why this is its own workflow rather than a job in ci-pr-validation.yml:
+#   - ci-pr-validation.yml passes `--ignore=tests/flaky`, so DEMO.md C4 as
+#     written could never have run the new EFD test.
+#   - ci-pr-validation.yml is being rewritten on the PR Signals branches
+#     (PRs #3 and #5), and those branches set
+#     DD_CIVISIBILITY_AUTO_TEST_RETRIES_ENABLED: "false" on demo-pr-validation.
+#     Sharing that file or that service would make this demo depend on which
+#     branch wins.
+#
+# `paths` is scoped to tests/flaky/** -- a filter no other workflow claims --
+# so this is the only check on the flake-prevention PR, and the TIA and
+# Parallel PR demos (src/** filters, same base branch) stay untouched.
+# Same rule as those two: for pull_request events GitHub diffs three-dot
+# against the merge base, so an empty commit re-fires the demo. Do NOT add
+# `paths` to the push trigger -- that is a two-dot diff, where an empty commit
+# changes nothing and the baseline-seeding run would silently not fire.
+#
+# The push leg is load-bearing. Early Flake Detection calls a test "new" when
+# it is absent from the known-tests baseline Datadog keeps PER TEST SERVICE.
+# demo-flake-prevention is a new service, so until this has run on `preprod`
+# at least once, every test in tests/flaky/ looks new and the gate would fire
+# on tests the PR did not add.
+
+on:
+  pull_request:
+    branches:
+      - preprod
+    paths:
+      - "tests/flaky/**"
+  push:
+    branches:
+      - preprod
+  workflow_dispatch:
+
+env:
+  DD_ENV: ci
+
+jobs:
+  flaky-suite:
+    name: flaky-suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-demo
+        env:
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+
+      - name: Run the flaky suite with Auto Test Retries
+        # tests/flaky/ is the ONLY directory this job runs. Every other
+        # workflow excludes it (shard_by_count.py EXCLUDED_DIRS,
+        # --tests-exclude-pattern, --ignore) because
+        # test_retry_recoverable.py is deterministically red without retries.
+        # Here that is the point: it fails its first attempt every run, so the
+        # green check IS the evidence that Auto Test Retries did something.
+        #
+        # ITR is off: TIA selects by coverage, and a flake demo that skips the
+        # flaky tests has nothing to show. FLAKY_RETRY_COUNT 5 is the Datadog
+        # default, stated here so the demo can point at it -- the feature
+        # itself is switched on in the Datadog UI, not by this variable.
+        run: pytest tests/flaky --ddtrace -v
+        env:
+          DD_ENV: ci
+          DD_SERVICE: demo-flake-prevention
+          DD_CIVISIBILITY_ITR_ENABLED: "false"
+          DD_CIVISIBILITY_FLAKY_RETRY_ENABLED: "true"
+          DD_CIVISIBILITY_FLAKY_RETRY_COUNT: "5"
+
+      - name: Where to look in Datadog
+        if: always()
+        # Deliberately no parsing of pytest output. Retry attempts are
+        # reported by the tracer, not printed in a format worth grepping, and
+        # the surfaces that matter here are the Datadog PR comment and the New
+        # Flaky Test gate. This step just hands over the queries.
+        run: |
+          sha="${{ github.event.pull_request.head.sha || github.sha }}"
+          branch="${{ github.head_ref || github.ref_name }}"
+          base="https://app.datadoghq.com/ci/test-runs?query="
+          {
+            echo "# Flake prevention"
+            echo ""
+            echo "Commit \`${sha}\` on \`${branch}\`, service \`demo-flake-prevention\`."
+            echo ""
+            echo "| what | query |"
+            echo "|---|---|"
+            echo "| Auto Test Retries fired | [\`@test.retry_reason:auto_test_retry\`](${base}%40test.retry_reason%3Aauto_test_retry%20%40git.commit.sha%3A${sha}) |"
+            echo "| EFD ran this session | [\`@test.early_flake.enabled:true\`](${base}%40test.early_flake.enabled%3Atrue%20%40git.commit.sha%3A${sha}) |"
+            echo "| Tests Datadog had never seen | [\`@test.is_new:true\`](${base}%40test.is_new%3Atrue%20%40git.commit.sha%3A${sha}) |"
+            echo "| EFD retries on those | [\`@test.retry_reason:early_flake_detection\`](${base}%40test.retry_reason%3Aearly_flake_detection%20%40git.commit.sha%3A${sha}) |"
+            echo "| Flagged new flaky | [\`@test.test_management.is_new_flaky:true\`](${base}%40test.test_management.is_new_flaky%3Atrue%20%40git.commit.sha%3A${sha}) |"
+            echo ""
+            echo "The **New Flaky Test** check on this PR is authored by Datadog, not by this"
+            echo "workflow. A green \`flaky-suite\` with a red gate is the expected end state:"
+            echo "retries kept the build passing, and the gate still caught the new flake."
+          } >> "$GITHUB_STEP_SUMMARY"

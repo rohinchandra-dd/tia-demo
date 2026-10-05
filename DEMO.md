@@ -7,8 +7,11 @@ Step-by-step scenarios for demonstrating Datadog CI/CD Optimization and Test Opt
 - [ ] `DD_API_KEY` configured as GitHub secret
 - [ ] GitHub App installed with CI Visibility enabled
 - [ ] Test Impact Analysis enabled (exclude `main` **and `preprod`** — see B0)
-- [ ] Auto Test Retries enabled for `demo-main-build`
-- [ ] Early Flake Detection enabled for `demo-pr-validation`
+- [ ] Auto Test Retries enabled for `demo-main-build` and `demo-flake-prevention`
+- [ ] PR Comments enabled for the repository (CI/CD Settings → Repositories → General)
+- [ ] Early Flake Detection enabled for `demo-flake-prevention` — **after** the Flake Prevention
+      workflow has run on `preprod` once (see C4)
+- [ ] New Flaky Test PR Gate rule created and scoped to this repository (see C6)
 - [ ] Run `scripts/seed_preprod.sh 3` — required after ANY `scripts/domain_spec.json` change
 - [ ] Run the **Demo Preflight** workflow and confirm it reports **GO** (see B1)
 - [ ] Run **CI - Seed Datadog Data** workflow (or manual steps below)
@@ -263,41 +266,91 @@ baseline. Kept for seeding `demo-optimized`.
 
 ---
 
-## Part C: Flaky tests (~10 min)
+## Part C: Flaky tests (~15 min)
+
+Parts A and B are about *seeing* the problem. Part C is about the three features that stop it:
+retries absorb a known flake, Early Flake Detection catches an unknown one, and the PR Gate
+refuses to let it reach the trunk.
+
+Everything from C1 on reports to `demo-flake-prevention` and runs through
+`flake-prevention-pr-demo.yml`, the only workflow that runs `tests/flaky/` on a pull request.
 
 ### C1 — Auto Test Retries
 
-1. Run **CI - Main Build** on `main`
-2. Find a retry-recoverable test in `tests/flaky/test_retry_recoverable.py`
-3. In Test Optimization Explorer, filter `@test.is_retry:true`
-4. Show build passed despite initial failure
+1. Open the flake-prevention PR and its **`flaky-suite`** check. It is **green**.
+2. Open `tests/flaky/test_retry_recoverable.py` and read the mechanism out loud: a module-level
+   counter, `if _attempts["payment"] == 1: pytest.fail(...)`. It fails its **first attempt, every
+   single run**. A green check is only possible because something retried it in-process.
+3. Datadog's **PR comment** on the PR lists the retried tests and their error messages.
+4. Test Runs → `@test.retry_reason:auto_test_retry` → the failed first attempt and the passing
+   retry, same commit, same process.
 
-**Talking points**: `DD_CIVISIBILITY_FLAKY_RETRY_COUNT`, in-process retry, no pipeline re-run needed.
+**Talking points**: `DD_CIVISIBILITY_FLAKY_RETRY_COUNT` (5 here), in-process, no pipeline re-run,
+no `pytest-rerunfailures` — the tracer does it. Contrast with `test-baseline.yml`, which sets
+`DD_CIVISIBILITY_FLAKY_RETRY_ENABLED: "false"` and therefore has to `--ignore=tests/flaky`
+entirely.
 
 ### C2 — Flaky test detection
 
-1. Re-run **CI - Main Build** on the **same commit** 3–4 times (GitHub → Re-run all jobs)
-2. Open **Flaky Tests** for the repository
-3. Show intermittent tests from `tests/flaky/test_intermittent.py`: failure rate, first/last flaked
+1. Re-run **Flake Prevention PR Demo** on the **same commit** 3–4 times.
+2. Open **Flaky Tests** for the repository.
+3. `tests/flaky/test_intermittent.py` — four tests at a 35% failure rate — shows failure rate and
+   first/last flaked. These are *known* flakes: Datadog has watched them fail before.
 
 ### C3 — Known flaky filter
 
-1. Go to **Test Runs** → facet **Known Flaky: true**
-2. Show failed runs tagged as known flaky vs new failures
+1. Test Runs → facet **Known Flaky: true**.
+2. The point of the facet: a failure that is already understood is noise, and the ones that are
+   not are the signal. C4 is about the second kind.
 
 ### C4 — Early Flake Detection
 
-1. Create branch `demo/introduce-flaky-test`
-2. Copy the template: `cp tests/flaky/_template_test_new_flaky_efd.py tests/flaky/test_new_flaky_efd.py`
-3. Open PR → **CI - PR Validation** runs
-3. Find `@test.is_new:true` and EFD retries on the new test
-4. Optionally configure a PR Gate to block merge
+The PR adds exactly one file, `tests/flaky/test_new_flaky_efd.py`, and nothing else. It reads like
+an ordinary feature PR; nobody labelled the test as risky.
 
-### C5 — TIA reduces flaky exposure
+1. Show the diff — one new test, `test_new_checkout_flow_timing`.
+2. Test Runs → `@test.is_new:true` on this commit. Datadog has never seen this test, because it is
+   absent from the known-tests baseline it keeps for `demo-flake-prevention`.
+3. `@test.retry_reason:early_flake_detection` → **ten** attempts on that one test, where the
+   other tests in the file ran once.
+4. The attempts alternate pass/fail, so the test is tagged **new flaky**:
+   `@test.test_management.is_new_flaky:true`.
 
-1. On a PR changing only `src/analytics/metrics.py`
-2. Show flaky inventory/shipping tests are **skipped** by TIA
-3. Unrelated flakes don't block the PR
+**The ordering that makes this work**: EFD's "is this new?" question is answered against a baseline
+kept **per test service**. `demo-flake-prevention` is a new service, so the Flake Prevention
+workflow must run on `preprod` (its push leg) *before* EFD is switched on — otherwise all seven
+pre-existing flaky tests are new too and the demo loses its point.
+
+### C5 — The New Flaky Test PR Gate
+
+1. Back to the PR's checks: **`flaky-suite` is green, the Datadog New Flaky Test check is red.**
+   That contrast is the whole argument. Retries did their job — the build is not broken — and the
+   gate still caught the flake being introduced.
+2. Click the red check → the gate detail in Datadog names `test_new_checkout_flow_timing`.
+3. If the gate is a required check on `preprod`, GitHub will not let the PR merge.
+
+**Talking points**: the gate is authored by the Datadog GitHub App from a UI rule — there is no
+`datadog-ci` call and no extra credential in `flake-prevention-pr-demo.yml`. It is advisory until
+someone marks it required in branch protection. Re-running the GitHub check does **not** re-evaluate
+the rule; a new commit does.
+
+### C6 — Clearing the gate
+
+The check stays red until the test is marked **Fixed** in Flaky Tests Management. Two routes:
+
+- **Attempt To Fix** (the one to show): open the test → **Actions → Link commit to fix** → copy the
+  `DD_`-prefixed key → push a fix with that key in the commit body. The library reruns the test and
+  verifies the fix.
+- Or set the state from Active to Fixed by hand.
+
+Leave the demo PR red. It is the artifact.
+
+### C7 — TIA reduces flaky exposure
+
+1. On a PR changing only `src/analytics/metrics.py` (the B0 PR).
+2. Flaky inventory/shipping tests are **skipped** by TIA — unrelated flakes don't block the PR.
+3. This is the cheap half of the story and worth naming as such: TIA reduces *exposure* to flakes.
+   It does not detect them. C4 and C5 do.
 
 ---
 
@@ -310,12 +363,18 @@ git checkout -b demo/tia-billing-fix
 git commit -am "fix: billing tax rounding"
 git push -u origin demo/tia-billing-fix
 
-# EFD demo — copy template to create a genuinely new test
-git checkout -b demo/introduce-flaky-test
+# EFD / PR Gate demo — copy template to create a genuinely new test.
+# Base on preprod: the `tests/flaky/**` path filter on flake-prevention-pr-demo.yml
+# makes `flaky-suite` the only check, and no other demo PR is disturbed.
+git checkout -b demo/introduce-flaky-test origin/preprod
 cp tests/flaky/_template_test_new_flaky_efd.py tests/flaky/test_new_flaky_efd.py
 git add tests/flaky/test_new_flaky_efd.py
 git commit -m "feat: add checkout flow test"
 git push -u origin demo/introduce-flaky-test
+gh pr create --base preprod --title "feat: add checkout flow timing test"
+
+# Re-fire the whole flake demo (three-dot diff still matches tests/flaky/**)
+git commit --allow-empty -m demo && git push
 
 # Force full suite (escape hatch)
 git commit -am "ITR:NoSkip chore: run all tests"
