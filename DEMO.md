@@ -387,10 +387,26 @@ gh api -X PUT repos/rohinchandra-dd/tia-demo/branches/preprod/protection --input
 JSON
 ```
 
-`enforce_admins` is off on purpose — leave yourself a way past the gate if a live demo goes
-sideways. `allow_force_pushes` stays on because `scripts/seed_preprod.sh` and the demo branches
-rely on it. Only the gate is required, deliberately: a required check that never reports blocks a
-PR forever, and PRs #6 and #7 never run `flaky-suite`.
+`enforce_admins` is off on purpose. Required status checks apply to **direct pushes**, not just
+merges, so turning it on would break `scripts/seed_preprod.sh` — which pushes empty commits
+straight to `preprod` and is the remediation for every cold-data NO-GO. `allow_force_pushes`
+stays on for the same reason. Only the gate is required, deliberately: a required check that
+never reports blocks a PR forever, and PRs #6 and #7 never run `flaky-suite`.
+
+> [!NOTE]
+> **Expect a "Merge without waiting for requirements to be met (bypass rules)" checkbox**, and
+> have a line ready for it. It renders only for users holding bypass permission — you, as repo
+> admin, with `enforce_admins` off. Anyone else on the team sees a dead merge button and no
+> checkbox.
+>
+> Say it out loud rather than hoping nobody notices: *"I'm an admin on this repo, so GitHub
+> offers me an override — and it records every use of it in the audit log. For the engineer
+> opening this PR, the button is simply disabled."* That is a governance point in its own right,
+> and it beats the alternative of someone in the audience spotting it first.
+>
+> GitHub ties bypass to the person, not the action, so there is no setting that blocks the merge
+> button while leaving admin pushes alone. If you want the checkbox gone for one demo, set
+> `enforce_admins: true` beforehand and back to `false` before the next seeding run.
 
 **Talking points**: the gate is authored by the Datadog GitHub App from a UI rule — there is no
 `datadog-ci` call and no extra credential in `flake-prevention-pr-demo.yml`. It is advisory until
