@@ -3,7 +3,7 @@ name: Parallel PR Demo
 # Three-way contrast of the SAME suite on the SAME commit, differing only in how
 # test files are distributed across nodes:
 #
-#   naive   4 fixed nodes, split by file COUNT        -> slowest node ~69s
+#   naive   4 fixed nodes, split by file COUNT        -> slowest node ~204s
 #   smart   ddtest picks the node count, by DURATION  -> nodes finish together
 #
 # Parallelization ONLY. Test Impact Analysis has its own demo (DEMO.md B0);
@@ -21,7 +21,8 @@ name: Parallel PR Demo
 # to "false" still ran only 288 of 965 tests.
 #
 # The `paths` filter keeps this off the TIA demo's PR, which also targets
-# `preprod` but touches src/billing. For pull_request events GitHub evaluates
+# `preprod` but touches a disjoint set of domains
+# (analytics/catalog/inventory/shared). For pull_request events GitHub evaluates
 # `paths` against the whole PR diff (a three-dot diff against the merge base),
 # not the latest push, so re-triggering with an empty commit still matches.
 # Do NOT add `paths` to the push trigger: that uses a two-dot diff, where an
@@ -30,8 +31,9 @@ name: Parallel PR Demo
 # The push leg is the seeding run. `ddtest` splits on Datadog p50 timings and
 # falls back to file-size heuristics without them; our durations are artificial
 # sleeps uncorrelated with file size, so a cold service splits badly and the
-# `smart` leg looks no better than `naive`. Let a few preprod pushes land before
-# demoing, and check the plan summary says the chosen node count is > 1.
+# `smart` leg looks no better than `naive`. Run `scripts/seed_preprod.sh` after
+# any change to scripts/domain_spec.json, and before demoing run the
+# `Demo Preflight` workflow -- the plan job's guard enforces this either way.
 
 on:
   pull_request:
@@ -59,15 +61,16 @@ env:
   DD_TEST_OPTIMIZATION_RUNNER_PLATFORM: python
   DD_TEST_OPTIMIZATION_RUNNER_FRAMEWORK: pytest
   DD_TEST_OPTIMIZATION_RUNNER_MIN_PARALLELISM: 1
-  # Capped at 4 deliberately. The selected set's largest file is 24s, so 4 nodes
-  # is the honest optimum (~27s each). Left at 8, ddtest picks 6 and the two
-  # extra nodes finish in ~4s -- measured 27/27/3.9/3.9/26/26.7 -- which costs
-  # compute and undercuts "every node finishes together".
+  # Capped at 4 deliberately. The selected set is 132s whose largest file is 30s
+  # (one compliance module), so 4 nodes is the honest optimum (~33s each). Left
+  # at 8, ddtest picks 6 and the extra nodes finish in ~4s -- measured
+  # 27/27/3.9/3.9/26/26.7 -- which costs compute and undercuts the claim that
+  # every node finishes together.
   DD_TEST_OPTIMIZATION_RUNNER_MAX_PARALLELISM: 4
   # Load-bearing. ddtest scores each candidate as
   # (slowest-worker time + nodes x overhead) and prefers fewer nodes on ties.
-  # Against 150s of work the 25s default scores 2 nodes best and lands at ~75s,
-  # barely beating the naive split. At 5s, 4 nodes wins and lands at ~38s.
+  # Against 132s of work the 25s default scores 2 nodes best and lands at ~66s,
+  # barely beating the naive split. At 5s, 4 nodes wins and lands at ~33s.
   DD_TEST_OPTIMIZATION_RUNNER_CI_JOB_OVERHEAD: 5s
 
 jobs:
@@ -89,7 +92,7 @@ jobs:
       - name: Run shard split by file count
         # The same count-based split the TIA demo uses, so node times are
         # directly comparable across the two demos. 41 files chopped into four
-        # equal-COUNT chunks with no idea what each costs: 69/32/16/33s.
+        # equal-COUNT chunks with no idea what each costs: 204/124/8/8s.
         run: |
           pytest $(python scripts/shard_by_count.py --shard ${{ matrix.shard }} --nodes 4) \
             --ddtrace -v
@@ -120,7 +123,9 @@ jobs:
         # means the planner would otherwise discover tests/flaky, which fails by
         # design and would sink the leg for reasons unrelated to splitting.
         run: |
-          bin/ddtest plan --tests-exclude-pattern 'tests/flaky/**'
+          set -o pipefail
+          bin/ddtest plan --tests-exclude-pattern 'tests/flaky/**' 2>&1 \
+            | tee ddtest-plan.log
         env:
           DD_ENV: ci
           DD_SERVICE: demo-parallel-smart
@@ -129,16 +134,71 @@ jobs:
           # backend test-suite durations available; setting it "false"
           # suppresses the durations entirely:
           #   WARN "Test durations API returned no test suites"
-      - name: Report chosen parallelism
+      - name: Report plan quality
+        # ddtest falls back to FILE SIZE weights when it gets no p50 durations
+        # from the backend. Our durations are artificial sleeps uncorrelated
+        # with file size, so that fallback silently produces a split no better
+        # than `naive` -- measured at 29/27/141/141s off "Backend durations
+        # used: 0 suites". It still reports as a green, successful run, which
+        # makes it the worst possible thing to discover live.
+        #
+        # This step only REPORTS, deliberately. It does not fail the job,
+        # because a red X mid-webinar is worse than a degraded bar, and because
+        # the zero-durations condition may be structural rather than a seeding
+        # gap (see DEMO.md B1 -- TIA skipping and the durations lookup appear to
+        # interact). The hard gate lives in demo-preflight.yml, which you run
+        # BEFORE the webinar, when there is still time to react.
         run: |
-          count=$(cat .testoptimization/runner/parallel-runners.txt)
-          files=$(wc -l < .testoptimization/runner/test-files.txt)
-          echo "### tia-parallel: ddtest chose **${count}** node(s) for ${files} files" \
-            >> "$GITHUB_STEP_SUMMARY"
+          set -euo pipefail
+          nodes=$(tr -dc '0-9' < .testoptimization/runner/parallel-runners.txt)
+          files=$(wc -l < .testoptimization/runner/test-files.txt | tr -d ' ')
+          # "Backend durations used: N suites" -- matched loosely so a change in
+          # ddtest's wording degrades to "unknown" rather than a false failure.
+          suites=$(grep -i duration ddtest-plan.log \
+            | grep -oiE '[0-9]+ suites?' | grep -oE '[0-9]+' | tail -1 || true)
+          {
+            echo "### tia-parallel plan"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| nodes chosen | **${nodes}** |"
+            echo "| test files selected | ${files} |"
+            echo "| backend duration suites | ${suites:-unknown} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          reason=""
+          if [ "${suites:-}" = "0" ] \
+            || grep -qi 'durations API returned no test suites' ddtest-plan.log; then
+            reason="ddtest got NO backend durations and fell back to file-size weights."
+          elif [ "$nodes" -lt 2 ]; then
+            reason="ddtest chose ${nodes} node(s); the demo needs a real split."
+          fi
+
+          if [ -n "$reason" ]; then
+            {
+              echo ""
+              echo "> [!CAUTION]"
+              echo "> ${reason}"
+              echo "> This split is **not** duration-based, so the nodes will not"
+              echo "> finish together and this leg may be no faster than \`naive\`."
+              echo "> Run \`scripts/seed_preprod.sh 3\`, then the \`Demo Preflight\`"
+              echo "> workflow, before relying on this bar. See DEMO.md B1."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::${reason} See DEMO.md B1; run scripts/seed_preprod.sh 3."
+          else
+            echo "> [!NOTE]" >> "$GITHUB_STEP_SUMMARY"
+            echo "> Duration-based split confirmed against ${suites} backend suite(s)." \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
       - uses: actions/upload-artifact@v4
+        # always(): when the guard above trips, the plan output is exactly what
+        # we need to see in order to diagnose it.
+        if: always()
         with:
           name: dd-artifacts-tia-parallel
-          path: .testoptimization
+          path: |
+            .testoptimization
+            ddtest-plan.log
           include-hidden-files: true
 
   tia_parallel:

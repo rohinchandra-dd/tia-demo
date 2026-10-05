@@ -75,11 +75,17 @@ jobs:
         # so node N is directly comparable across them.
         #
         # The demo change touches analytics/catalog/inventory/shared, which puts
-        # exactly 4 selected test files in EVERY shard -- so each node runs a
-        # similar NUMBER of tests (~48). Only the analytics files carry real
-        # duration (24s each), so node 0 takes ~96s while the rest take ~4s.
-        # That is the point: equal work by count, wildly unequal by duration.
-        # Budgets live in scripts/domain_spec.json.
+        # exactly 4 selected test files in EVERY shard -- so every node runs the
+        # same NUMBER of tests (48, or 53 on node 2 with the unskippable
+        # integration file). Only the analytics files carry real duration (30s
+        # each), so node 0 takes ~120s while the rest take ~4s. That is the
+        # point, and the setup for the Parallel PR Demo: equal work by count,
+        # 30x unequal by duration. Budgets live in scripts/domain_spec.json.
+        #
+        # What TIA removes from node 0 is billing calculator+discounts (40s
+        # each). If a tia node runs materially more than the count above, the
+        # per-test coverage for `demo-tia` is stale -- re-seed with
+        # scripts/seed_preprod.sh, do not retune the spec.
         run: |
           pytest $(python scripts/shard_by_count.py --shard ${{ matrix.shard }} --nodes 4) \
             --ddtrace -v

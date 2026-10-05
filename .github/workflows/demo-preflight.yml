@@ -1,0 +1,102 @@
+name: Demo Preflight
+
+# Go/no-go check to run on the morning of the webinar. Non-destructive: it
+# plans a split and reads back what Datadog knows, but runs no tests and
+# pushes no commits.
+#
+# Both demo bars depend on data Datadog can only learn by watching the suite
+# run on `preprod`, and both FAIL SOFTLY when that data is cold -- the TIA bar
+# comes out level with the naive bar, and ddtest falls back to splitting by
+# file size. Neither shows up as a red X. This workflow turns both into one
+# explicit answer before anyone is watching.
+#
+# Remediation is always `scripts/seed_preprod.sh 3`, never a code change.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  preflight:
+    name: preflight
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-demo
+        with:
+          install_ddtest: "true"
+        env:
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+
+      - id: plan
+        name: Plan a split and capture what the backend knows
+        # Same invocation, service and env as parallel-pr-demo.yml's plan job,
+        # so this exercises exactly the data path the demo will take.
+        run: |
+          set -o pipefail
+          bin/ddtest plan --tests-exclude-pattern 'tests/flaky/**' 2>&1 \
+            | tee ddtest-plan.log
+        env:
+          DD_ENV: ci
+          DD_SERVICE: demo-parallel-smart
+
+      - name: Report go / no-go
+        run: |
+          set -uo pipefail
+          nodes=$(tr -dc '0-9' < .testoptimization/runner/parallel-runners.txt)
+          files=$(wc -l < .testoptimization/runner/test-files.txt | tr -d ' ')
+          suites=$(grep -i duration ddtest-plan.log \
+            | grep -oiE '[0-9]+ suites?' | grep -oE '[0-9]+' | tail -1 || true)
+
+          problems=()
+          if [ "${suites:-}" = "0" ] \
+            || grep -qi 'durations API returned no test suites' ddtest-plan.log; then
+            problems+=("No backend p50 durations -- ddtest would split by file size, so bar 3 would be no faster than bar 1.")
+          fi
+          if [ "${nodes:-0}" -lt 4 ]; then
+            problems+=("ddtest chose ${nodes:-?} node(s), expected 4 -- bar 3 will not show every node finishing together.")
+          fi
+
+          {
+            echo "# Demo preflight"
+            echo ""
+            echo "| check | value | expected |"
+            echo "|---|---|---|"
+            echo "| nodes ddtest chose | **${nodes:-?}** | 4 |"
+            echo "| backend duration suites | ${suites:-unknown} | > 0 |"
+            echo "| test files selected | ${files} | 41 on preprod |"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ ${#problems[@]} -eq 0 ]; then
+            {
+              echo "> [!NOTE]"
+              echo "> **GO.** Datadog has fresh timings for \`demo-parallel-smart\`."
+              echo "> Trigger the demos with an empty commit:"
+              echo "> \`\`\`"
+              echo "> git commit --allow-empty -m demo && git push origin tia/add-tax-fix"
+              echo "> git commit --allow-empty -m demo && git push origin parallel/typing-cleanup"
+              echo "> \`\`\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          {
+            echo "> [!CAUTION]"
+            echo "> **NO-GO.**"
+            for p in "${problems[@]}"; do echo "> - ${p}"; done
+            echo ">"
+            echo "> Fix: \`scripts/seed_preprod.sh 3\`, then re-run this workflow."
+          } >> "$GITHUB_STEP_SUMMARY"
+          for p in "${problems[@]}"; do echo "::error::${p}"; done
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: demo-preflight-plan
+          path: |
+            .testoptimization
+            ddtest-plan.log
+          include-hidden-files: true

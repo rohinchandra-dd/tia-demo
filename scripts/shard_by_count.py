@@ -6,10 +6,10 @@ files, chop them into N contiguous chunks of equal FILE COUNT, and hope each
 chunk costs about the same. It does not, and that is the point — both demos
 use this as the "before" picture:
 
-    shard 0: 10 files,  69s    <- holds tests/billing/test_calculator.py (37s)
-    shard 1: 10 files,  32s
-    shard 2: 10 files,  16s
-    shard 3: 11 files,  33s
+    shard 0: 10 files, 204s    <- analytics x4 (30s), auth x4, billing 2x40s
+    shard 1: 10 files, 124s    <- compliance x4 (30s), catalog x4, billing 2x0s
+    shard 2: 10 files,   8s
+    shard 3: 11 files,   8s
 
 Used by tia-pr-demo.yml (both legs) and parallel-pr-demo.yml (the naive leg),
 so all three produce the identical partition and their node times are directly

@@ -13,6 +13,8 @@ pip install -r requirements.txt
 # The generator emits unformatted code, so always format afterwards or the
 # PR Validation lint job fails and the diff looks far larger than it is.
 python scripts/generate_test_modules.py && ruff format src tests scripts
+# ...then re-seed Datadog, or both demos degrade silently:
+scripts/seed_preprod.sh 3
 
 # Run tests locally (skip slow tests for speed)
 pytest -m "not slow" -q
@@ -29,7 +31,8 @@ pytest -q
 | `tests/` | 972 tests: 960 parametrized domain + 5 integration + 7 flaky demos |
 | `tests/flaky/` | Controlled flaky tests for retry/detection demos |
 | `scripts/generate_test_modules.py` | Regenerates src + tests from `domain_spec.json` |
-| `.github/workflows/` | 11 GitHub Actions pipelines (+ seed orchestrator) |
+| `.github/workflows/` | 13 GitHub Actions pipelines (+ seed orchestrator, + preflight) |
+| `scripts/seed_preprod.sh` | Re-seeds TIA coverage + ddtest p50 timings on `preprod` |
 
 ## CI pipelines
 
@@ -47,8 +50,13 @@ Each workflow appears as a separate pipeline in [Datadog CI Visibility](https://
 | Test Impact Analysis | `test-impact-analysis.yml` | manual / `demo/**` | _Seeding only_ — superseded as a demo by TIA PR Demo |
 | Test Parallelization | `test-parallelization.yml` | manual / `demo/**` | ddtest matrix only |
 | Test Optimized | `test-optimized.yml` | manual / `demo/**` | TIA + parallel combined |
-| **TIA PR Demo** | `tia-pr-demo.yml` | PRs into `preprod` touching `src/billing/**` | **Baseline vs TIA across 4 nodes (8 checks)** |
-| **Parallel PR Demo** | `parallel-pr-demo.yml` | PRs into `preprod` touching `src/{analytics,auth,catalog,inventory}/**` | **Naive count split vs ddtest duration split** (needs `ITR:NoSkip` in the commit message) |
+| **TIA PR Demo** | `tia-pr-demo.yml` | PRs into `preprod` touching `src/{analytics,catalog,inventory,shared}/**` | **Baseline vs TIA across 4 nodes (8 checks)** — demo bars 1 and 2 |
+| **Parallel PR Demo** | `parallel-pr-demo.yml` | PRs into `preprod` touching `src/{auth,compliance,notifications,shipping}/**` | **Naive count split vs TIA + ddtest duration split** — demo bar 3 |
+| **Demo Preflight** | `demo-preflight.yml` | manual | **GO/NO-GO check before a live demo** — runs no tests |
+
+The two `paths` filters are deliberately disjoint so the two demo PRs never cross-trigger.
+Because GitHub evaluates `paths` on a pull request against the three-dot diff, an **empty
+commit** on either branch re-fires the whole demo — that is the live trigger.
 
 ### Test services (`DD_SERVICE`)
 
@@ -56,7 +64,7 @@ Each pipeline reports to a distinct test service for clean Datadog filtering:
 
 - `demo-quick-smoke`, `demo-pr-validation`, `demo-main-build`, `demo-nightly`, `demo-hotfix`
 - `demo-baseline`, `demo-tia`, `demo-parallel`, `demo-optimized`
-- `demo-parallel-naive`, `demo-parallel-smart`, `demo-parallel-tia` (Parallel PR Demo legs)
+- `demo-parallel-naive`, `demo-parallel-smart` (Parallel PR Demo legs)
 
 ## Datadog setup
 
@@ -86,7 +94,19 @@ In [CI/CD Optimization → Settings → Repositories](https://app.datadoghq.com/
 
 ### 4. Seeding before a live demo
 
-**Automated (recommended):** Actions → **CI - Seed Datadog Data** → Run workflow
+**For the TIA / Parallel PR demos (required after any `domain_spec.json` change):**
+
+```bash
+scripts/seed_preprod.sh 3      # lands 3 full runs on preprod, serially
+gh workflow run demo-preflight.yml --ref preprod
+```
+
+Regenerating test files invalidates their per-test coverage and p50 timings, and both demos
+**fail softly** when that data is cold — the TIA bar comes out level with the baseline bar and
+`ddtest` falls back to splitting by file size. Neither shows up as a failed run, so always
+confirm **Demo Preflight** reports GO.
+
+**Everything else — automated:** Actions → **CI - Seed Datadog Data** → Run workflow
 
 Default options dispatch Quick Smoke, Main Build ×3, Nightly, Hotfix, PR Validation, Parallelization, and create `demo/seed-automation` for TIA/optimized test workflows.
 
@@ -99,7 +119,7 @@ See [DEMO.md](DEMO.md) for step-by-step demo scripts.
 - **972 tests**: 960 parametrized across 40 domain test files, 5 integration, 7 flaky.
   Demo workflows pass `--ignore=tests/flaky`, so they run **965** (regenerate for more via `domain_spec.json`)
 - **TIA mapping**: `tests/billing/test_calculator.py` ↔ `src/billing/calculator.py`
-- **Slow tests**: `@pytest.mark.slow` on 8 heavy modules; per-file budgets set by `sleep_seconds` in `domain_spec.json` (150s total, deterministic)
+- **Slow tests**: `@pytest.mark.slow` on 8 heavy modules; per-file budgets set by `sleep_seconds` in `domain_spec.json` (344s total, deterministic) — 30s on each `analytics` and `compliance` file, 40s on `billing.calculator` and `billing.discounts`, 1s on the 24 light modules. Duration is independent of test count: `heavy` controls how many tests a module emits, `sleep_seconds` how long they take
 - **Unskippable**: `tests/integration/test_data_driven.py` reads `fixtures/`
 - **Flaky demos**: `tests/flaky/` — retry-recoverable, intermittent, and EFD scenarios
 
