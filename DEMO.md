@@ -147,13 +147,22 @@ selected tests, both nodes finish within a second of each other, and we come in 
 against the naive split's 230 — on half the machines. The bill goes from nine minutes to
 five."*
 
-**Do not skip the cost line — it is the one an exec remembers.** The `cost summary` job at the
-bottom of every run prints it automatically:
+**Do not skip the cost line — it is the one an exec remembers.** The runner count is visible
+in the Actions UI (two `tia-parallel (node N)` jobs against four `naive` ones); the billed
+minutes are not, so quote them from here:
 
 | leg | runners | wall clock | runner-seconds | billed minutes |
 | --- | --- | --- | --- | --- |
 | `naive` | 4 | 230s | 444s | **9** |
 | `tia-parallel` | **2** | 133s | 230s | **5** |
+
+To regenerate that table for any run — worth doing once before the webinar so the numbers on
+screen are the ones you quote:
+
+```bash
+gh api "repos/rohinchandra-dd/tia-demo/actions/runs/<RUN_ID>/jobs" --paginate \
+  --jq '.jobs[] | {name, started_at, completed_at}' | python3 scripts/cost_summary.py
+```
 
 #### Why it chose 2, and why that is the cost story
 

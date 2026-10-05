@@ -276,29 +276,3 @@ jobs:
           DD_ENV: ci
           DD_SERVICE: demo-parallel-smart
           # ITR left ON here too, for the same reason as the plan step.
-
-
-  # ---------------------------------------------------------------- summary
-  cost_summary:
-    name: cost summary
-    runs-on: ubuntu-latest
-    needs: [naive, tia_parallel_plan, tia_parallel]
-    # always(): the comparison is most worth reading when a leg went sideways.
-    if: always()
-    permissions:
-      actions: read
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - name: Compare runners, wall clock and billed minutes
-        # Rendering lives in scripts/cost_summary.py so it can be tested
-        # locally against a past run, rather than only in anger during a demo.
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SLUG: ${{ github.repository }}
-          RUN_ID: ${{ github.run_id }}
-        run: |
-          set -euo pipefail
-          gh api "repos/${SLUG}/actions/runs/${RUN_ID}/jobs" --paginate \
-            --jq '.jobs[] | {name, started_at, completed_at}' \
-            | python3 scripts/cost_summary.py >> "$GITHUB_STEP_SUMMARY"

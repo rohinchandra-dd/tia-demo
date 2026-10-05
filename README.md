@@ -34,7 +34,7 @@ pytest -q
 | `.github/workflows/` | 13 GitHub Actions pipelines (+ seed orchestrator, + preflight) |
 | `scripts/seed_preprod.sh` | Re-seeds TIA coverage + ddtest p50 timings on `preprod` |
 | `scripts/measure_job_overhead.py` | Measures real per-runner cost, to set `CI_JOB_OVERHEAD` from evidence |
-| `scripts/cost_summary.py` | Renders the per-leg runners / wall / billed-minutes table |
+| `scripts/cost_summary.py` | Renders the per-leg runners / wall / billed-minutes table for a run (run locally; deliberately not a CI job) |
 
 ## CI pipelines
 
