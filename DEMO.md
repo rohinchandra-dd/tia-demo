@@ -376,6 +376,10 @@ git commit -m "feat: add checkout flow test"
 git push -u origin demo/introduce-flaky-test
 gh pr create --base preprod --title "feat: add checkout flow timing test"
 
+# The branch name matches `demo/**`, which the four seeding workflows also watch.
+# They carry `paths-ignore: tests/flaky/**` so they stay off this branch and the
+# PR shows the single `flaky-suite` check.
+
 # Re-fire the whole flake demo (three-dot diff still matches tests/flaky/**)
 git commit --allow-empty -m demo && git push
 

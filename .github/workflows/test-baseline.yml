@@ -5,6 +5,14 @@ on:
   push:
     branches:
       - "demo/**"
+    # The flake-prevention demo branch (demo/introduce-flaky-test) also matches
+    # "demo/**", and a seeding run is not wanted on it: its PR should carry the
+    # single `flaky-suite` check and nothing else. A push that touches only
+    # tests/flaky/ is that branch; a push that touches src/ is a real seeding
+    # branch and still fires. An empty commit changes no files, so it skips
+    # here too -- which is what re-firing the flake demo does.
+    paths-ignore:
+      - "tests/flaky/**"
 
 env:
   DD_ENV: ci

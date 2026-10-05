@@ -48,10 +48,10 @@ Each workflow appears as a separate pipeline in [Datadog CI Visibility](https://
 | Nightly Regression | `ci-nightly-regression.yml` | cron + manual | Scheduled CI, ddtest parallelization |
 | Hotfix Fast Path | `ci-hotfix-fast-path.yml` | manual | TIA + parallel on demand |
 | **Seed Datadog Data** | `ci-seed-datadog.yml` | manual | **One-click: triggers all seed workflows** |
-| Test Baseline | `test-baseline.yml` | manual / `demo/**` | _Seeding only_ — superseded as a demo by TIA PR Demo |
-| Test Impact Analysis | `test-impact-analysis.yml` | manual / `demo/**` | _Seeding only_ — superseded as a demo by TIA PR Demo |
-| Test Parallelization | `test-parallelization.yml` | manual / `demo/**` | ddtest matrix only |
-| Test Optimized | `test-optimized.yml` | manual / `demo/**` | TIA + parallel combined |
+| Test Baseline | `test-baseline.yml` | manual / `demo/**` (not `tests/flaky/**`-only pushes) | _Seeding only_ — superseded as a demo by TIA PR Demo |
+| Test Impact Analysis | `test-impact-analysis.yml` | manual / `demo/**` (not `tests/flaky/**`-only pushes) | _Seeding only_ — superseded as a demo by TIA PR Demo |
+| Test Parallelization | `test-parallelization.yml` | manual / `demo/**` (not `tests/flaky/**`-only pushes) | ddtest matrix only |
+| Test Optimized | `test-optimized.yml` | manual / `demo/**` (not `tests/flaky/**`-only pushes) | TIA + parallel combined |
 | **TIA PR Demo** | `tia-pr-demo.yml` | PRs into `preprod` touching `src/{analytics,catalog,inventory,shared}/**` | **Baseline vs TIA across 4 nodes (8 checks)** — demo bars 1 and 2 |
 | **Parallel PR Demo** | `parallel-pr-demo.yml` | PRs into `preprod` touching `src/{auth,compliance,notifications,shipping}/**` | **Naive 4 fixed runners vs TIA + ddtest right-sizing to 2** — demo bar 3, and the cost argument (9 billed minutes → 5) |
 | **Flake Prevention PR Demo** | `flake-prevention-pr-demo.yml` | PRs into `preprod` touching `tests/flaky/**` | **Auto Test Retries, Early Flake Detection, and the New Flaky Test PR Gate** — the only workflow that runs `tests/flaky/` on a PR |
