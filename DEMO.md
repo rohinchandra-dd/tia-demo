@@ -11,7 +11,9 @@ Step-by-step scenarios for demonstrating Datadog CI/CD Optimization and Test Opt
 - [ ] PR Comments enabled for the repository (CI/CD Settings → Repositories → General)
 - [ ] Early Flake Detection enabled for `demo-flake-prevention` — **after** the Flake Prevention
       workflow has run on `preprod` once (see C4)
-- [ ] New Flaky Test PR Gate rule created and scoped to this repository (see C6)
+- [ ] New Flaky Test PR Gate rule created and scoped to this repository (see C5)
+- [ ] `preprod` branch protection requires the gate check — **Datadog cannot block a merge on its
+      own**, it only publishes the check (see C5)
 - [ ] Run `scripts/seed_preprod.sh 3` — required after ANY `scripts/domain_spec.json` change
 - [ ] Run the **Demo Preflight** workflow and confirm it reports **GO** (see B1)
 - [ ] Run **CI - Seed Datadog Data** workflow (or manual steps below)
@@ -364,7 +366,31 @@ pre-existing flaky tests are new too and the demo loses its point.
    That contrast is the whole argument. Retries did their job — the build is not broken — and the
    gate still caught the flake being introduced.
 2. Click the red check → the gate detail in Datadog names `test_new_checkout_flow_timing`.
-3. If the gate is a required check on `preprod`, GitHub will not let the PR merge.
+3. The merge button is greyed out. `gh pr view 8 --json mergeStateStatus` reports `BLOCKED`.
+
+**This last step is not automatic.** Datadog publishes the check; only GitHub can refuse a merge
+on it, so the gate is advisory until `preprod` branch protection requires it:
+
+```bash
+gh api -X PUT repos/rohinchandra-dd/tia-demo/branches/preprod/protection --input - <<'JSON'
+{
+  "required_status_checks": {
+    "strict": false,
+    "checks": [{ "context": "Datadog PR Gates / No new flaky tests", "app_id": 1358509 }]
+  },
+  "enforce_admins": false,
+  "required_pull_request_reviews": null,
+  "restrictions": null,
+  "allow_force_pushes": true,
+  "allow_deletions": false
+}
+JSON
+```
+
+`enforce_admins` is off on purpose — leave yourself a way past the gate if a live demo goes
+sideways. `allow_force_pushes` stays on because `scripts/seed_preprod.sh` and the demo branches
+rely on it. Only the gate is required, deliberately: a required check that never reports blocks a
+PR forever, and PRs #6 and #7 never run `flaky-suite`.
 
 **Talking points**: the gate is authored by the Datadog GitHub App from a UI rule — there is no
 `datadog-ci` call and no extra credential in `flake-prevention-pr-demo.yml`. It is advisory until

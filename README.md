@@ -99,6 +99,7 @@ In [CI/CD Optimization → Settings → Repositories](https://app.datadoghq.com/
 | Early Flake Detection | Enabled for `demo-flake-prevention` (under **Prevention**) — turn on only **after** the Flake Prevention workflow has run on `preprod` at least once, or every test in `tests/flaky/` looks new |
 | PR Comments | Enabled (under **General**) — this is how retries surface on the PR itself. Repo- or org-level only; it cannot be overridden per test service |
 | New Flaky Test PR Gate | A rule at [PR Gates → Create Rule](https://app.datadoghq.com/ci/pr-gates/rule/create?dataSource=test_optimization), scoped to this repository, with the Early Flake Detection option ticked |
+| Blocking the merge | **Not a Datadog setting.** The gate check must be marked required in GitHub branch protection on `preprod` — see DEMO.md C5 |
 
 ### 4. Seeding before a live demo
 
