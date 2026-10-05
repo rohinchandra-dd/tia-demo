@@ -305,18 +305,31 @@ entirely.
 
 ### C4 — Early Flake Detection
 
-The PR adds exactly one file, `tests/flaky/test_new_flaky_efd.py`, and nothing else. It reads like
-an ordinary feature PR; nobody labelled the test as risky.
+The PR adds exactly one file, `tests/flaky/test_checkout_timing.py`, and nothing else. It reads
+like an ordinary feature PR; nobody labelled the test as risky.
 
-1. Show the diff — one new test, `test_new_checkout_flow_timing`. It is deliberately written
+1. Show the diff — one new test, `test_checkout_total_recalculation_latency`. It is deliberately written
    the way a real test would be: the alternating module-level counter is the only thing odd
    about it, and nobody reviewing the PR flagged it. (The template it was copied from is
    `tests/flaky/_template_test_new_flaky_efd.py`, underscore-prefixed so pytest skips it.)
 2. Test Runs → `@test.is_new:true` on this commit. Datadog has never seen this test, because it is
    absent from the known-tests baseline it keeps for `demo-flake-prevention`.
-3. `@test.retry_reason:early_flake_detection` → **ten** attempts on that one test, where the
-   other tests in the file ran once.
-4. The attempts alternate pass/fail, so the test is tagged **new flaky**:
+3. The job log names the reason in plain text — and it is a *different* reason from every other
+   test in the same run:
+
+   ```
+   test_checkout_total_recalculation_latency RETRY FAILED (Early Flake Detection)
+   test_checkout_total_recalculation_latency RETRY PASSED (Early Flake Detection)
+   test_checkout_total_recalculation_latency FLAKY
+   test_payment_gateway_timeout              RETRY FAILED (Auto Test Retries)
+   test_payment_gateway_timeout              RETRY PASSED (Auto Test Retries)
+   test_payment_gateway_timeout              PASSED
+   ```
+
+   EFD is budgeted for up to ten attempts but stops as soon as the answer is settled: one fail
+   and one pass is already a mixed result, so it marks the test **FLAKY** and moves on. Contrast
+   the verdicts — the known flake ends `PASSED` (retries did their job), the new one ends `FLAKY`.
+4. `@test.retry_reason:early_flake_detection` isolates those attempts; the test is tagged
    `@test.test_management.is_new_flaky:true`.
 
 **The ordering that makes this work**: EFD's "is this new?" question is answered against a baseline
@@ -335,11 +348,19 @@ pre-existing flaky tests are new too and the demo loses its point.
 > ```
 > @test.service:demo-flake-prevention @test.name:<your_test_name>
 > ```
-> Names already burned on this service: `test_new_checkout_flow_timing`.
+> Names already burned on this service: `test_new_checkout_flow_timing`,
+> `test_checkout_total_recalculation_timing`, `test_checkout_total_recalculation_latency`.
 
 ### C5 — The New Flaky Test PR Gate
 
-1. Back to the PR's checks: **`flaky-suite` is green, the Datadog New Flaky Test check is red.**
+1. Back to the PR's checks — there are exactly two:
+
+   | check | result |
+   | --- | --- |
+   | `flaky-suite` | **pass** |
+   | `Datadog PR Gates / No new flaky tests` | **fail** |
+
+   **Green build, red gate.**
    That contrast is the whole argument. Retries did their job — the build is not broken — and the
    gate still caught the flake being introduced.
 2. Click the red check → the gate detail in Datadog names `test_new_checkout_flow_timing`.
