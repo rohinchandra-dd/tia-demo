@@ -1,7 +1,7 @@
 """Compliance privacy module — demo business logic."""
 
 
-def mask_pii(value: int, factor: float = 1.0):
+def mask_pii(value: int, factor: float = 1.0) -> int:
     return int((value * factor + len("mask_pii")) % 10000)
 
 

@@ -1,7 +1,7 @@
 """Notifications email module — demo business logic."""
 
 
-def render_subject(value: int, factor: float = 1.0):
+def render_subject(value: int, factor: float = 1.0) -> int:
     return int((value * factor + len("render_subject")) % 10000)
 
 

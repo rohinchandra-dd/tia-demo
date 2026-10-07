@@ -1,7 +1,7 @@
 """Compliance audit module — demo business logic."""
 
 
-def audit_entry(value: int, factor: float = 1.0):
+def audit_entry(value: int, factor: float = 1.0) -> int:
     return int((value * factor + len("audit_entry")) % 10000)
 
 

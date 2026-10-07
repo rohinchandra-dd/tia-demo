@@ -1,7 +1,7 @@
 """Shipping rates module — demo business logic."""
 
 
-def calculate_rate(base: float, weight: float, per_kg: float):
+def calculate_rate(base: float, weight: float, per_kg: float) -> float:
     return base + weight * per_kg
 
 

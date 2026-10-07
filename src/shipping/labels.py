@@ -1,7 +1,7 @@
 """Shipping labels module — demo business logic."""
 
 
-def generate_label(order_id: int):
+def generate_label(order_id: int) -> str:
     return f"LBL-{order_id}"
 
 

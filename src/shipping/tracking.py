@@ -1,7 +1,7 @@
 """Shipping tracking module — demo business logic."""
 
 
-def track_status(status: str):
+def track_status(status: str) -> str:
     return status if status in {"shipped", "delivered", "pending"} else "unknown"
 
 
